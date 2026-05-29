@@ -1,0 +1,47 @@
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.venv/
+.env/
+
+# Node/React
+node_modules/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+.vite
+
+# Docker
+.docker_volumes/
+
+# Databases
+*.db
+*.sqlite3
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+e2e_screenshots/
