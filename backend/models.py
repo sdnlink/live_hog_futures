@@ -82,6 +82,14 @@ class SwineCapacity(Base):
     pork_production = Column(Float, nullable=True)         # 猪肉产量 (万吨)
     hog_slaughter = Column(Float, nullable=True)           # 生猪出栏量 (万头)
     hog_inventory = Column(Float, nullable=True)           # 生猪存栏量 (万头)
+    pork_consumption = Column(Float, nullable=True)         # 猪肉消费量 (万吨)
+
+class PorkPrice(Base):
+    __tablename__ = "pork_prices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    price = Column(Float)                                  # 猪肉批发均价 (元/公斤)
 
 class EpidemicReport(Base):
     __tablename__ = "epidemic_reports"

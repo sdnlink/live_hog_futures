@@ -9,7 +9,7 @@ from backend.database import SessionLocal
 from backend.scraper import (
     fetch_historical_kline, fetch_spot_prices, fetch_provincial_prices,
     fetch_breeding_indicators, fetch_swine_capacity, fetch_epidemic_reports,
-    fetch_sentiment_radar, LH_CONTRACTS
+    fetch_sentiment_radar, LH_CONTRACTS, fetch_pork_prices
 )
 
 def run_seeding():
@@ -28,6 +28,10 @@ def run_seeding():
     # 3. National Spot Prices
     print("\n3. Fetching national spot price trend from AkShare...")
     fetch_spot_prices(db)
+    
+    # 3b. Wholesale Pork Prices
+    print("\n3b. Fetching wholesale pork prices from AkShare...")
+    fetch_pork_prices(db)
     
     # 4. Provincial Price Rankings
     print("\n4. Fetching current provincial price rankings...")

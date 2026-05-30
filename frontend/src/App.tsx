@@ -68,6 +68,11 @@ interface SpotPrice {
   basis: number | null;
 }
 
+interface PorkPrice {
+  date: string;
+  price: number;
+}
+
 interface ProvincialPrice {
   date: string;
   province: string;
@@ -81,6 +86,7 @@ interface SwineCapacity {
   pork_production: number;
   hog_slaughter: number;
   hog_inventory: number;
+  pork_consumption: number | null;
 }
 
 interface BreedingIndicator {
@@ -145,6 +151,7 @@ function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('LH0');
   const [klineData, setKlineData] = useState<FuturesKline[]>([]);
   const [spotBasisData, setSpotBasisData] = useState<SpotPrice[]>([]);
+  const [porkPriceData, setPorkPriceData] = useState<PorkPrice[]>([]);
   const [provPrices, setProvPrices] = useState<ProvincialPrice[]>([]);
   const [capacityData, setCapacityData] = useState<SwineCapacity[]>([]);
   const [costsData, setCostsData] = useState<BreedingIndicator[]>([]);
@@ -162,6 +169,18 @@ function App() {
   // UI Interactive States
   const [activeChartTab, setActiveChartTab] = useState<string>('spot-futures');
   const [activeAdviceTab, setActiveAdviceTab] = useState<'farmers' | 'middle' | 'traders'>('farmers');
+  const [timeRange, setTimeRange] = useState<'30d' | '90d' | '180d' | 'all'>('all');
+
+  const filterByTimeRange = useCallback(<T extends { date: string }>(data: T[]): T[] => {
+    if (timeRange === 'all' || !data.length) return data;
+    const daysMap = { '30d': 30, '90d': 90, '180d': 180 };
+    const limitDays = daysMap[timeRange];
+    const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const latestDate = new Date(sortedData[sortedData.length - 1].date);
+    const cutoffDate = new Date(latestDate);
+    cutoffDate.setDate(cutoffDate.getDate() - limitDays);
+    return sortedData.filter(item => new Date(item.date) >= cutoffDate);
+  }, [timeRange]);
 
   // Breeding Calculator States (Interactive Inputs)
   const [calcInputs, setCalcInputs] = useState({
@@ -198,15 +217,16 @@ function App() {
     try {
       setErrorMsg('');
       
-      const [spotRes, provRes, capRes, costRes, epiRes] = await Promise.all([
+      const [spotRes, provRes, capRes, costRes, epiRes, porkRes] = await Promise.all([
         fetch(`${BASE_URL}/api/spot/basis`),
         fetch(`${BASE_URL}/api/spot/provincial`),
         fetch(`${BASE_URL}/api/fundamentals/capacity`),
         fetch(`${BASE_URL}/api/fundamentals/costs`),
         fetch(`${BASE_URL}/api/epidemic/status`),
+        fetch(`${BASE_URL}/api/spot/pork`),
       ]);
 
-      if (!spotRes.ok || !provRes.ok || !capRes.ok || !costRes.ok || !epiRes.ok) {
+      if (!spotRes.ok || !provRes.ok || !capRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok) {
         throw new Error('Failed to retrieve macro fundamental data from backend.');
       }
 
@@ -215,8 +235,10 @@ function App() {
       const swineCapData: SwineCapacity[] = await capRes.json();
       const breedingCosts: BreedingIndicator[] = await costRes.json();
       const epidemicStatus = await epiRes.json();
+      const porkData: PorkPrice[] = await porkRes.json();
 
       setSpotBasisData(spotData);
+      setPorkPriceData(porkData);
       setProvPrices(provincialData);
       setCapacityData(swineCapData);
       setCostsData(breedingCosts);
@@ -763,9 +785,34 @@ function App() {
                 成本计算器
               </button>
             </div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              当前选定合约: <strong className="mono" style={{ color: 'var(--color-accent)' }}>{selectedSymbol}</strong>
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {activeChartTab !== 'calculator' && (
+                <div className="time-range-selector" style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.02)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                  {(['30d', '90d', '180d', 'all'] as const).map(range => (
+                    <button
+                      key={range}
+                      onClick={() => setTimeRange(range)}
+                      style={{
+                        background: timeRange === range ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                        border: 'none',
+                        color: timeRange === range ? 'var(--text-primary)' : 'var(--text-muted)',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {range === 'all' ? '全部' : `${range.slice(0, -1)}天`}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                当前选定合约: <strong className="mono" style={{ color: 'var(--color-accent)' }}>{selectedSymbol}</strong>
+              </span>
+            </div>
           </div>
 
           <div className="chart-viewport">
@@ -773,15 +820,17 @@ function App() {
             {activeChartTab === 'spot-futures' && (
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
-                  data={spotBasisData.map(item => {
+                  data={filterByTimeRange(spotBasisData.map(item => {
                     // Match corresponding selected futures price on this date
                     const k = klineData.find(kd => kd.date === item.date);
+                    const p = porkPriceData.find(pd => pd.date === item.date);
                     return {
                       date: item.date,
                       spotPrice: item.price,
                       futuresPrice: k && k.close ? k.close / 1000 : null, // Convert ton to kg
+                      porkPrice: p ? p.price : null,
                     };
-                  }).filter(d => d.futuresPrice !== null)}
+                  }).filter(d => d.futuresPrice !== null))}
                   margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -789,8 +838,9 @@ function App() {
                   <YAxis stroke="var(--text-muted)" domain={['dataMin - 1', 'dataMax + 1']} fontSize={11} unit="元" />
                   <Tooltip content={<CustomChartTooltip />} />
                   <Legend verticalAlign="top" height={36} />
-                  <Line name="现货均价 (全国)" type="monotone" dataKey="spotPrice" stroke="var(--color-up)" strokeWidth={2.5} dot={false} />
-                  <Line name={`期货价 (${selectedSymbol} 折合)`} type="monotone" dataKey="futuresPrice" stroke="var(--color-accent)" strokeWidth={2} dot={false} strokeDasharray="4 4" />
+                  <Line name="现货均价 (全国)" type="monotone" dataKey="spotPrice" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
+                  <Line name={`期货价 (${selectedSymbol} 折合)`} type="monotone" dataKey="futuresPrice" stroke="var(--color-accent)" strokeWidth={2} dot={false} strokeDasharray="4 4" connectNulls />
+                  <Line name="猪肉批发价 (消费端)" type="monotone" dataKey="porkPrice" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
                 </ComposedChart>
               </ResponsiveContainer>
             )}
@@ -799,7 +849,7 @@ function App() {
             {activeChartTab === 'basis' && (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
-                  data={spotBasisData.filter(d => d.basis !== null)}
+                  data={filterByTimeRange(spotBasisData.filter(d => d.basis !== null))}
                   margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
                 >
                   <defs>
@@ -823,7 +873,7 @@ function App() {
             {activeChartTab === 'cost-profits' && (
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
-                  data={costsData}
+                  data={filterByTimeRange(costsData)}
                   margin={{ top: 20, right: 30, bottom: 20, left: 10 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -840,27 +890,64 @@ function App() {
               </ResponsiveContainer>
             )}
 
-            {/* Chart 4: Capacity */}
+            {/* Chart 4: Capacity & Consumption */}
             {activeChartTab === 'capacity' && (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={capacityData}
-                  margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
-                >
-                  <defs>
-                    <linearGradient id="colorCap" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                  <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} />
-                  <YAxis stroke="var(--text-muted)" domain={['dataMin - 50', 'dataMax + 50']} fontSize={11} unit="万头" />
-                  <Tooltip content={<CustomChartTooltip />} />
-                  <Legend verticalAlign="top" height={36} />
-                  <Area name="能繁母猪存栏量 (万头)" type="monotone" dataKey="maternal_sow_inventory" stroke="var(--color-accent)" fillOpacity={1} fill="url(#colorCap)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="capacity-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', height: '100%' }}>
+                {/* Panel 1: Live Hog Production Capacity & Inventory */}
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+                    生猪产能与存栏量趋势 (万头)
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={filterByTimeRange(capacityData)}
+                        margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="colorSow" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                        <YAxis yAxisId="left" stroke="var(--text-muted)" domain={['dataMin - 100', 'dataMax + 100']} fontSize={10} />
+                        <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" domain={['dataMin - 5000', 'dataMax + 5000']} fontSize={10} />
+                        <Tooltip content={<CustomChartTooltip />} />
+                        <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                        <Area yAxisId="left" name="能繁母猪存栏" type="monotone" dataKey="maternal_sow_inventory" stroke="var(--color-accent)" fillOpacity={1} fill="url(#colorSow)" strokeWidth={2} />
+                        <Bar yAxisId="right" name="生猪存栏" dataKey="hog_inventory" fill="rgba(103, 58, 183, 0.45)" stroke="rgb(103, 58, 183)" barSize={20} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Panel 2: Pork Production & Consumption Balance */}
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+                    猪肉产量与消费端消费量对比
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={filterByTimeRange(capacityData)}
+                        margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                        <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '猪肉量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                        <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '出栏量 (万头)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                        <Tooltip content={<CustomChartTooltip />} />
+                        <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                        <Line yAxisId="left" name="猪肉产量 (供给)" type="monotone" dataKey="pork_production" stroke="var(--color-up)" strokeWidth={2.5} dot={true} />
+                        <Line yAxisId="left" name="猪肉消费量 (消费)" type="monotone" dataKey="pork_consumption" stroke="var(--color-warn)" strokeWidth={2.5} dot={true} />
+                        <Bar yAxisId="right" name="生猪出栏量" dataKey="hog_slaughter" fill="rgba(0, 188, 212, 0.45)" stroke="rgb(0, 188, 212)" barSize={20} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Interactive Calculator Tab */}

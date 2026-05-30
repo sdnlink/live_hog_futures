@@ -7,12 +7,13 @@ from typing import List, Dict, Any
 from .database import engine, Base, get_db
 from .models import (
     FuturesQuote, FuturesKline, SpotPrice, ProvincialPrice,
-    BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex
+    BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice
 )
 from .scraper import (
     fetch_live_futures, LH_CONTRACTS, fetch_spot_prices,
     fetch_provincial_prices, fetch_breeding_indicators,
-    fetch_swine_capacity, fetch_sentiment_radar, fetch_historical_kline
+    fetch_swine_capacity, fetch_sentiment_radar, fetch_historical_kline,
+    fetch_pork_prices
 )
 from .scheduler import start_scheduler, stop_scheduler
 
@@ -69,6 +70,9 @@ def trigger_data_sync(db: Session = Depends(get_db)):
         # 2. National spot prices
         fetch_spot_prices(db)
         
+        # 2b. Wholesale pork prices
+        fetch_pork_prices(db)
+        
         # 3. Provincial price rankings
         fetch_provincial_prices(db)
         
@@ -118,6 +122,12 @@ def get_spot_and_basis(db: Session = Depends(get_db)):
     """Get historical spot prices and computed basis values"""
     spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
     return spots
+
+@app.get("/api/spot/pork")
+def get_pork_prices(db: Session = Depends(get_db)):
+    """Get historical wholesale pork prices"""
+    prices = db.query(PorkPrice).order_by(PorkPrice.date.asc()).all()
+    return prices
 
 @app.get("/api/spot/provincial")
 def get_provincial_prices(db: Session = Depends(get_db)):

@@ -6,7 +6,7 @@ from .database import SessionLocal
 from .scraper import (
     fetch_live_futures, fetch_spot_prices, fetch_provincial_prices,
     fetch_breeding_indicators, fetch_swine_capacity, fetch_sentiment_radar,
-    LH_CONTRACTS, fetch_historical_kline
+    LH_CONTRACTS, fetch_historical_kline, fetch_pork_prices
 )
 
 # Global flag to control scheduler
@@ -63,6 +63,7 @@ def daily_scheduler_loop():
                 
                 # Fetch daily indicators
                 fetch_spot_prices(db)
+                fetch_pork_prices(db)
                 fetch_provincial_prices(db)
                 fetch_breeding_indicators(db)
                 fetch_swine_capacity(db)
@@ -85,6 +86,61 @@ def daily_scheduler_loop():
     db.close()
     print("Daily macro statistics scheduler loop stopped.")
 
+def random_sync_scheduler_loop():
+    """Task running at a random interval of 1 to 10 minutes to sync all data"""
+    import random
+    global _running
+    print("Random interval full synchronization scheduler loop started.")
+    
+    while _running:
+        try:
+            # Random interval between 1 and 10 minutes (60 to 600 seconds)
+            interval = random.randint(60, 600)
+            print(f"Next full synchronization scheduled in {interval} seconds ({round(interval/60, 1)} minutes)...")
+            
+            # Sleep in small increments to respond quickly to shutdown events
+            slept = 0
+            while slept < interval and _running:
+                time.sleep(2)
+                slept += 2
+                
+            if not _running:
+                break
+                
+            print(f"Triggering automatic background full synchronization at {datetime.datetime.now()}...")
+            db = SessionLocal()
+            try:
+                # 1. Real-time quotes
+                fetch_live_futures(db)
+                # 2. National spot prices
+                fetch_spot_prices(db)
+                # 2b. Wholesale pork prices
+                fetch_pork_prices(db)
+                # 3. Provincial price rankings
+                fetch_provincial_prices(db)
+                # 4. Breeding profit/cost indicators
+                fetch_breeding_indicators(db)
+                # 5. Swine capacity
+                fetch_swine_capacity(db)
+                # 6. Sentiment indexes
+                fetch_sentiment_radar(db)
+                # 7. K-line history
+                fetch_historical_kline("LH0", db)
+                for symbol in LH_CONTRACTS:
+                    fetch_historical_kline(symbol, db)
+                print("Automatic background full synchronization completed successfully.")
+            except Exception as ex:
+                print("Error during background full synchronization:", ex)
+                traceback.print_exc()
+            finally:
+                db.close()
+                
+        except Exception as e:
+            print("Error in random sync scheduler loop:", e)
+            time.sleep(30)
+            
+    print("Random interval full synchronization scheduler loop stopped.")
+
 def start_scheduler():
     global _running
     if _running:
@@ -97,6 +153,9 @@ def start_scheduler():
     
     t2 = threading.Thread(target=daily_scheduler_loop, daemon=True)
     t2.start()
+    
+    t3 = threading.Thread(target=random_sync_scheduler_loop, daemon=True)
+    t3.start()
     
     print("Background schedulers successfully initialized.")
 
