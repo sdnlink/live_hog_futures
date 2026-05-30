@@ -139,14 +139,14 @@ def get_expert_advice(db: Session = Depends(get_db)):
     weight_trend = "up" # holding back
     
     # 5. Fetch epidemic warnings
-    sentiment_records = db.query(SentimentIndex).order_by(SentimentIndex.date.desc()).limit(4).all()
+    sentiment_records = db.query(SentimentIndex).order_by(SentimentIndex.date.desc()).limit(10).all()
     asf_score = 0.0
     ped_score = 0.0
     for s in sentiment_records:
-        if s.keyword == "非洲猪瘟":
-            asf_score = s.sentiment_score
-        elif s.keyword == "流行性腹泻":
-            ped_score = s.sentiment_score
+        if s.keyword in ["非洲猪瘟", "非瘟", "小飞"]:
+            asf_score = max(asf_score, s.sentiment_score)
+        elif s.keyword in ["流行性腹泻", "腹泻"]:
+            ped_score = max(ped_score, s.sentiment_score)
             
     # 6. Evaluation Logic & Verification Conclusions
     conclusion_title = "供需处于拉锯整理阶段"

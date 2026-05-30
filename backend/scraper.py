@@ -536,12 +536,15 @@ def fetch_sentiment_radar(db: Session = None):
     try:
         today = datetime.date.today()
         # Simulate keywords frequency for the sentiment radar
-        # Keywords: 非洲猪瘟 (ASF), 流行性腹泻 (PED), 压栏惜售 (Holdback), 恐慌抛售 (Panic)
+        # Keywords: 非瘟, 腹泻, 压栏, 抛售, 小飞, 咳喘, 死猪
         keywords_data = [
-            {"keyword": "非洲猪瘟", "frequency": 42, "sentiment_score": 15.0}, # score out of 100 representing warning level
-            {"keyword": "流行性腹泻", "frequency": 65, "sentiment_score": 35.0},
-            {"keyword": "压栏惜售", "frequency": 118, "sentiment_score": 75.0},
-            {"keyword": "恐慌抛售", "frequency": 25, "sentiment_score": 12.0}
+            {"keyword": "非瘟", "frequency": 42, "sentiment_score": 15.0},
+            {"keyword": "腹泻", "frequency": 65, "sentiment_score": 35.0},
+            {"keyword": "压栏", "frequency": 118, "sentiment_score": 75.0},
+            {"keyword": "抛售", "frequency": 25, "sentiment_score": 12.0},
+            {"keyword": "小飞", "frequency": 18, "sentiment_score": 8.0},
+            {"keyword": "咳喘", "frequency": 30, "sentiment_score": 10.0},
+            {"keyword": "死猪", "frequency": 15, "sentiment_score": 5.0}
         ]
         
         for item in keywords_data:
