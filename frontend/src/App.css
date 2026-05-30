@@ -666,3 +666,38 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Sync Button Styles */
+.sync-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-accent-glow);
+  border: 1px solid rgba(41, 121, 255, 0.3);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.sync-btn:hover:not(:disabled) {
+  background: rgba(41, 121, 255, 0.25);
+  border-color: rgba(41, 121, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.sync-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.sync-btn:disabled {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+

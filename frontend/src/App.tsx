@@ -137,7 +137,7 @@ interface ExpertAdvice {
   };
 }
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = '/sys1';
 
 function App() {
   // Global App States
@@ -155,6 +155,7 @@ function App() {
   // Status States
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRealtimePolling, setIsRealtimePolling] = useState<boolean>(false);
+  const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
@@ -308,6 +309,28 @@ function App() {
   const handleSymbolSelect = (symbol: string) => {
     setSelectedSymbol(symbol);
     fetchKline(symbol);
+  };
+
+  // Handle manual data synchronization
+  const handleManualSync = async () => {
+    try {
+      setIsManualSyncing(true);
+      setErrorMsg('');
+      const res = await fetch(`${BASE_URL}/api/sync/all`, { method: 'POST' });
+      if (!res.ok) {
+        throw new Error('同步请求失败，服务器内部错误');
+      }
+      // Re-fetch all data after sync is done
+      await fetchStaticData();
+      await fetchRealtimeQuotes();
+      await fetchKline(selectedSymbol);
+      alert('所有基本面数据同步完成！');
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || '手动同步失败，请检查网络或后端服务');
+    } finally {
+      setIsManualSyncing(false);
+    }
   };
 
   // 4. Calculate Breeding Calculator outputs in real-time
@@ -536,6 +559,16 @@ function App() {
             <Activity size={14} />
             <span>最近同步: {lastSyncTime || 'N/A'}</span>
           </div>
+
+          <button 
+            className="sync-btn" 
+            onClick={handleManualSync} 
+            disabled={isManualSyncing}
+            title="实时同步所有最新数据"
+          >
+            <RefreshCw size={14} className={isManualSyncing ? "animate-spin" : ""} />
+            <span>{isManualSyncing ? "正在同步..." : "立即同步"}</span>
+          </button>
         </div>
       </header>
 

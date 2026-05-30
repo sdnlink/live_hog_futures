@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>期货数据监控与决策大屏控制中心</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #080c14;
+            --bg-gradient: radial-gradient(circle at 50% 0%, #111a2e 0%, #080c14 80%);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #475569;
+            --color-accent: #2979ff;
+            --color-accent-glow: rgba(41, 121, 255, 0.2);
+            --color-success: #00e676;
+            --color-warn: #ffd600;
+            --panel-bg: rgba(15, 23, 42, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.05);
+            --panel-glow: 0 10px 40px 0 rgba(0, 0, 0, 0.5);
+            --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: var(--bg-gradient);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Ambient Glow Objects */
+        .ambient-glow-1 {
+            position: absolute;
+            top: -10%;
+            left: 20%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(41, 121, 255, 0.08) 0%, rgba(0,0,0,0) 70%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .ambient-glow-2 {
+            position: absolute;
+            bottom: 5%;
+            right: 15%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.05) 0%, rgba(0,0,0,0) 70%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 60px 24px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Portal Header */
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .logo-box {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: var(--panel-bg);
+            border: 1px solid rgba(41, 121, 255, 0.3);
+            box-shadow: 0 0 20px var(--color-accent-glow);
+            color: var(--color-accent);
+            margin-bottom: 24px;
+            animation: pulse-glow 3s infinite ease-in-out;
+        }
+
+        .logo-box svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Portal Menu Grid */
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 968px) {
+            .portal-grid {
+                grid-template-columns: 1fr;
+                max-width: 450px;
+                margin: 0 auto;
+            }
+        }
+
+        /* System Selection Card */
+        .system-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--panel-border);
+            border-radius: 20px;
+            padding: 32px;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 280px;
+            box-shadow: var(--panel-glow);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .system-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(41, 121, 255, 0.05) 0%, rgba(0,0,0,0) 50%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .system-card.active-system:hover {
+            transform: translateY(-8px);
+            border-color: rgba(41, 121, 255, 0.4);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(41, 121, 255, 0.15);
+        }
+
+        .system-card.active-system:hover::before {
+            opacity: 1;
+        }
+
+        .system-card.disabled-system {
+            opacity: 0.65;
+            cursor: not-allowed;
+            border-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.online {
+            color: var(--color-success);
+            background: rgba(0, 230, 118, 0.05);
+            border-color: rgba(0, 230, 118, 0.15);
+        }
+
+        .status-badge.planned {
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.02);
+            border-color: rgba(255, 255, 255, 0.04);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .status-badge.online .status-dot {
+            background-color: var(--color-success);
+            box-shadow: 0 0 6px var(--color-success);
+            animation: pulse-dot 1.5s infinite alternate;
+        }
+
+        .status-badge.planned .status-dot {
+            background-color: var(--text-muted);
+        }
+
+        .instance-id {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .card-body {
+            flex-grow: 1;
+            margin-bottom: 24px;
+        }
+
+        .system-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            transition: color 0.3s ease;
+        }
+
+        .system-card.active-system:hover .system-title {
+            color: var(--color-accent);
+        }
+
+        .system-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--color-accent);
+        }
+
+        .card-footer svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.3s ease;
+        }
+
+        .system-card.active-system:hover .card-footer svg {
+            transform: translateX(4px);
+        }
+
+        .disabled-system .card-footer {
+            color: var(--text-muted);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+        }
+
+        /* Keyframes */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(41, 121, 255, 0.15); }
+            50% { box-shadow: 0 0 25px rgba(41, 121, 255, 0.35); }
+        }
+
+        @keyframes pulse-dot {
+            0% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-glow-1"></div>
+    <div class="ambient-glow-2"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo-box">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.656 48.656 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M3 12l-3 3m3-3l3 3M9 9h.008v.008H9V9zm0 6h.008v.008H9V15zm6-6h.008v.008H15V9zm0 6h.008v.008H15V15z"></path>
+                </svg>
+            </div>
+            <h1>控制中心子系统选择门户</h1>
+            <p class="subtitle">统一网关反向代理分发平台。请选择要进入的基本面监控与智能化交易决策系统实例。</p>
+        </header>
+
+        <main class="portal-grid">
+            <!-- Instance 1 -->
+            <a href="/sys1/" class="system-card active-system">
+                <div class="card-header">
+                    <div class="status-badge online">
+                        <span class="status-dot"></span>
+                        <span>系统就绪</span>
+                    </div>
+                    <span class="instance-id">SYS_INSTANCE_01</span>
+                </div>
+                <div class="card-body">
+                    <h2 class="system-title">生猪期货监控系统</h2>
+                    <p class="system-desc">大商所生猪合约监测、猪粮比价与能繁母猪产能警示、期现收敛分析与专家智能决策。</p>
+                </div>
+                <div class="card-footer">
+                    <span>进入实例 A</span>
+                    <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"></path>
+                    </svg>
+                </div>
+            </a>
+
+            <!-- Instance 2 (Placeholder) -->
+            <div class="system-card disabled-system">
+                <div class="card-header">
+                    <div class="status-badge planned">
+                        <span class="status-dot"></span>
+                        <span>规划中</span>
+                    </div>
+                    <span class="instance-id">SYS_INSTANCE_02</span>
+                </div>
+                <div class="card-body">
+                    <h2 class="system-title">蛋鸡及饲料原料系统</h2>
+                    <p class="system-desc">鸡蛋合约走势监控、蛋鸡存栏与淘鸡周期、玉米/豆粕饲料成本配比与综合利润估算。</p>
+                </div>
+                <div class="card-footer">
+                    <span>未启用</span>
+                </div>
+            </div>
+
+            <!-- Instance 3 (Placeholder) -->
+            <div class="system-card disabled-system">
+                <div class="card-header">
+                    <div class="status-badge planned">
+                        <span class="status-dot"></span>
+                        <span>规划中</span>
+                    </div>
+                    <span class="instance-id">SYS_INSTANCE_03</span>
+                </div>
+                <div class="card-body">
+                    <h2 class="system-title">油脂油料套利终端</h2>
+                    <p class="system-desc">大豆/豆油/棕榈油跨品种套利监控、压榨利润走势分析、进口船期与港口库存跟踪。</p>
+                </div>
+                <div class="card-footer">
+                    <span>未启用</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer>
+        CONTROL PORTAL GATEWAY v1.0.0 © 2026
+    </footer>
+
+</body>
+</html>

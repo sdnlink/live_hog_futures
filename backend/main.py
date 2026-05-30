@@ -9,7 +9,11 @@ from .models import (
     FuturesQuote, FuturesKline, SpotPrice, ProvincialPrice,
     BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex
 )
-from .scraper import fetch_live_futures, LH_CONTRACTS
+from .scraper import (
+    fetch_live_futures, LH_CONTRACTS, fetch_spot_prices,
+    fetch_provincial_prices, fetch_breeding_indicators,
+    fetch_swine_capacity, fetch_sentiment_radar, fetch_historical_kline
+)
 from .scheduler import start_scheduler, stop_scheduler
 
 app = FastAPI(title="生猪期货基本面数据监控与决策系统 API", version="1.0.0")
@@ -25,6 +29,26 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
+    # Ensure database tables exist
+    from .database import engine, Base
+    Base.metadata.create_all(bind=engine)
+    
+    # Run seeding if database is empty
+    from .database import SessionLocal
+    from .models import FuturesQuote
+    db = SessionLocal()
+    try:
+        if db.query(FuturesQuote).count() == 0:
+            print("Database is empty. Running initial data seeding...")
+            from .seed_data import run_seeding
+            run_seeding()
+        else:
+            print("Database already contains data, skipping initial seeding.")
+    except Exception as e:
+        print("Error during database startup checks:", e)
+    finally:
+        db.close()
+
     # Automatically start background data scheduler
     start_scheduler()
 
@@ -34,6 +58,39 @@ def shutdown_event():
     stop_scheduler()
 
 # ==================== Endpoints ====================
+
+@app.post("/api/sync/all")
+def trigger_data_sync(db: Session = Depends(get_db)):
+    """Manually trigger a full sync of all live and macro fundamental data from external APIs"""
+    try:
+        # 1. Real-time quotes
+        fetch_live_futures(db)
+        
+        # 2. National spot prices
+        fetch_spot_prices(db)
+        
+        # 3. Provincial price rankings
+        fetch_provincial_prices(db)
+        
+        # 4. Breeding profit/cost indicators
+        fetch_breeding_indicators(db)
+        
+        # 5. Swine capacity
+        fetch_swine_capacity(db)
+        
+        # 6. Sentiment indexes
+        fetch_sentiment_radar(db)
+        
+        # 7. K-line history
+        fetch_historical_kline("LH0", db)
+        for symbol in LH_CONTRACTS:
+            fetch_historical_kline(symbol, db)
+            
+        return {"status": "success", "message": "All data synchronized successfully!"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/futures/realtime")
 def get_realtime_futures(db: Session = Depends(get_db)):
