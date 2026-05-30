@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -152,6 +152,8 @@ function App() {
   // Global App States
   const [quotes, setQuotes] = useState<FuturesQuote[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<string>('LH0');
+  // Ref to always hold the latest selectedSymbol inside interval callbacks (avoids stale closure)
+  const selectedSymbolRef = useRef<string>('LH0');
   const [klineData, setKlineData] = useState<FuturesKline[]>([]);
   const [spotBasisData, setSpotBasisData] = useState<SpotPrice[]>([]);
   const [porkPriceData, setPorkPriceData] = useState<PorkPrice[]>([]);
@@ -168,6 +170,7 @@ function App() {
   const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [nextRefreshSec, setNextRefreshSec] = useState<number>(0);
 
   // UI Interactive States
   const [activeChartTab, setActiveChartTab] = useState<string>('spot-futures');
@@ -311,28 +314,59 @@ function App() {
     }
   }, []);
 
-  // Initialize and Setup Polling
+  // Initialize and Setup Random Auto-Refresh (1–10 minutes)
+  // IMPORTANT: deps array is [] so this effect runs ONLY ONCE on mount.
+  // selectedSymbol is read via selectedSymbolRef.current to avoid stale closures
+  // without causing the effect to re-run (which would trigger full loading again).
   useEffect(() => {
     const initApp = async () => {
       setIsLoading(true);
       await fetchStaticData();
       await fetchRealtimeQuotes();
-      await fetchKline(selectedSymbol);
+      await fetchKline(selectedSymbolRef.current);
       setIsLoading(false);
     };
     initApp();
 
-    // Poll every 10 seconds
-    const interval = setInterval(() => {
-      fetchRealtimeQuotes();
-    }, 10000);
+    // Tick every 10 seconds — fine-grained enough for countdown display,
+    // without hammering React with per-second re-renders.
+    const TICK_SEC = 10;
+    const pickRandomInterval = () => {
+      // Random between 60 and 600 seconds, snapped to multiples of TICK_SEC
+      const raw = Math.floor(Math.random() * (600 - 60 + 1)) + 60;
+      return Math.round(raw / TICK_SEC) * TICK_SEC;
+    };
 
-    return () => clearInterval(interval);
-  }, [fetchStaticData, fetchRealtimeQuotes, fetchKline, selectedSymbol]);
+    let remainingSec = pickRandomInterval();
+    setNextRefreshSec(remainingSec);
 
-  // Handle symbol change
+    // Single interval — handles both countdown display and refresh trigger
+    const timer = setInterval(() => {
+      setNextRefreshSec(prev => {
+        const next = prev - TICK_SEC;
+        if (next <= 0) {
+          // Time to refresh — schedule micro-task so state update finishes first
+          setTimeout(() => {
+            fetchStaticData();
+            fetchRealtimeQuotes();
+            fetchKline(selectedSymbolRef.current);
+          }, 0);
+          const newInterval = pickRandomInterval();
+          remainingSec = newInterval;
+          return newInterval;
+        }
+        return next;
+      });
+    }, TICK_SEC * 1000);
+
+    return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);  // Empty deps: runs only on mount. Callbacks are stable useCallbacks.
+
+  // Handle symbol change — also keeps ref in sync
   const handleSymbolSelect = (symbol: string) => {
     setSelectedSymbol(symbol);
+    selectedSymbolRef.current = symbol;
     fetchKline(symbol);
   };
 
@@ -583,6 +617,15 @@ function App() {
           <div className="sync-badge">
             <Activity size={14} />
             <span>最近同步: {lastSyncTime || 'N/A'}</span>
+          </div>
+
+          <div className="sync-badge" title="前端自动全量刷新倒计时（1–10分钟随机）">
+            <RefreshCw size={14} />
+            <span>
+              {nextRefreshSec > 0
+                ? `${Math.floor(nextRefreshSec / 60)}:${String(nextRefreshSec % 60).padStart(2, '0')} 后刷新`
+                : '刷新中...'}
+            </span>
           </div>
 
           <button 
