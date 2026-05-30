@@ -83,6 +83,8 @@ class SwineCapacity(Base):
     hog_slaughter = Column(Float, nullable=True)           # 生猪出栏量 (万头)
     hog_inventory = Column(Float, nullable=True)           # 生猪存栏量 (万头)
     pork_consumption = Column(Float, nullable=True)         # 猪肉消费量 (万吨)
+    slaughterhouse_volume = Column(Float, nullable=True)          # 屠宰场定点屠宰量 (万头)
+    slaughterhouse_operating_rate = Column(Float, nullable=True)  # 屠宰场开工率 (%)
 
 class PorkPrice(Base):
     __tablename__ = "pork_prices"

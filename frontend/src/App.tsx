@@ -27,7 +27,8 @@ import {
   Tooltip,
   Legend,
   ReferenceLine,
-  BarChart
+  BarChart,
+  LineChart
 } from 'recharts';
 import './App.css';
 
@@ -87,6 +88,8 @@ interface SwineCapacity {
   hog_slaughter: number;
   hog_inventory: number;
   pork_consumption: number | null;
+  slaughterhouse_volume: number | null;
+  slaughterhouse_operating_rate: number | null;
 }
 
 interface BreedingIndicator {
@@ -815,7 +818,7 @@ function App() {
             </div>
           </div>
 
-          <div className="chart-viewport">
+          <div className="chart-viewport" style={activeChartTab === 'capacity' ? { height: '820px' } : undefined}>
             {/* Chart 1: Spot vs Futures Convergence */}
             {activeChartTab === 'spot-futures' && (
               <ResponsiveContainer width="100%" height="100%">
@@ -892,11 +895,11 @@ function App() {
 
             {/* Chart 4: Capacity & Consumption */}
             {activeChartTab === 'capacity' && (
-              <div className="capacity-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', height: '100%' }}>
-                {/* Panel 1: Live Hog Production Capacity & Inventory */}
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+              <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
+                {/* Panel 1: Live Hog Production Capacity, Inventory & Slaughterhouse Trends */}
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-                    生猪产能与存栏量趋势 (万头)
+                    生猪产能、存栏与定点屠宰场趋势
                   </div>
                   <div style={{ flex: 1, minHeight: 0 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -904,35 +907,37 @@ function App() {
                         data={filterByTimeRange(capacityData)}
                         margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
                       >
-                        <defs>
-                          <linearGradient id="colorSow" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                         <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                        <YAxis yAxisId="left" stroke="var(--text-muted)" domain={['dataMin - 100', 'dataMax + 100']} fontSize={10} />
-                        <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" domain={['dataMin - 5000', 'dataMax + 5000']} fontSize={10} />
+                        {/* Left YAxis for Sow Capacity and Slaughterhouse Volume (values ~1000 to ~5000) */}
+                        <YAxis yAxisId="left" stroke="var(--text-muted)" domain={['dataMin - 100', 'dataMax + 100']} fontSize={10} label={{ value: '产能与屠宰量 (万头)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                        {/* Right YAxis 1 for Hog Inventory (values ~40000 to ~50000) */}
+                        <YAxis yAxisId="right-inventory" orientation="right" stroke="var(--text-muted)" domain={['dataMin - 1000', 'dataMax + 1000']} fontSize={10} label={{ value: '生猪存栏 (万头)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                        {/* Right YAxis 2 for Operating Rate (%) - Hidden to avoid overlap but provides correct 0-100 scaling */}
+                        <YAxis yAxisId="right-rate" orientation="right" stroke="var(--text-muted)" domain={[0, 100]} fontSize={10} hide={true} />
+
                         <Tooltip content={<CustomChartTooltip />} />
                         <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                        <Area yAxisId="left" name="能繁母猪存栏" type="monotone" dataKey="maternal_sow_inventory" stroke="var(--color-accent)" fillOpacity={1} fill="url(#colorSow)" strokeWidth={2} />
-                        <Bar yAxisId="right" name="生猪存栏" dataKey="hog_inventory" fill="rgba(103, 58, 183, 0.45)" stroke="rgb(103, 58, 183)" barSize={20} />
+
+                        <Line yAxisId="left" name="能繁母猪存栏" type="monotone" dataKey="maternal_sow_inventory" stroke="var(--color-accent)" strokeWidth={2.5} dot={false} connectNulls />
+                        <Line yAxisId="left" name="定点屠宰量" type="monotone" dataKey="slaughterhouse_volume" stroke="rgb(233, 30, 99)" strokeWidth={2.5} dot={false} connectNulls />
+                        <Line yAxisId="right-inventory" name="生猪存栏" type="monotone" dataKey="hog_inventory" stroke="rgb(103, 58, 183)" strokeWidth={2.5} dot={false} connectNulls />
+                        <Line yAxisId="right-rate" name="屠宰开工率" type="monotone" dataKey="slaughterhouse_operating_rate" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* Panel 2: Pork Production & Consumption Balance */}
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+                {/* Panel 2: Pork Production & Consumption Balance — pure line chart, stacked below Panel 1 */}
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
                     猪肉产量与消费端消费量对比
                   </div>
                   <div style={{ flex: 1, minHeight: 0 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart
+                      <LineChart
                         data={filterByTimeRange(capacityData)}
-                        margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+                        margin={{ top: 10, right: 50, bottom: 5, left: 0 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                         <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
@@ -940,10 +945,10 @@ function App() {
                         <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '出栏量 (万头)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
                         <Tooltip content={<CustomChartTooltip />} />
                         <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                        <Line yAxisId="left" name="猪肉产量 (供给)" type="monotone" dataKey="pork_production" stroke="var(--color-up)" strokeWidth={2.5} dot={true} />
-                        <Line yAxisId="left" name="猪肉消费量 (消费)" type="monotone" dataKey="pork_consumption" stroke="var(--color-warn)" strokeWidth={2.5} dot={true} />
-                        <Bar yAxisId="right" name="生猪出栏量" dataKey="hog_slaughter" fill="rgba(0, 188, 212, 0.45)" stroke="rgb(0, 188, 212)" barSize={20} />
-                      </ComposedChart>
+                        <Line yAxisId="left" name="猪肉产量 (供给)" type="monotone" dataKey="pork_production" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
+                        <Line yAxisId="left" name="猪肉消费量 (消费)" type="monotone" dataKey="pork_consumption" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
+                        <Line yAxisId="right" name="生猪出栏量" type="monotone" dataKey="hog_slaughter" stroke="rgb(0, 188, 212)" strokeWidth={2} dot={false} strokeDasharray="5 3" connectNulls />
+                      </LineChart>
                     </ResponsiveContainer>
                   </div>
                 </div>

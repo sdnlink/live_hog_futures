@@ -213,7 +213,7 @@ def fetch_historical_kline(symbol: str, db: Session = None) -> int:
 def fetch_spot_prices(db: Session = None):
     """
     Fetch national average spot prices from AkShare.
-    Uses spot_hog_year_trend_soozhu or index_hog_spot_price.
+    Combines long-term index_hog_spot_price (weekly since 2015) and recent spot_hog_year_trend_soozhu (daily last 200 days).
     """
     should_close = False
     if db is None:
@@ -221,13 +221,40 @@ def fetch_spot_prices(db: Session = None):
         should_close = True
         
     try:
-        print("Fetching spot prices from AkShare...")
-        # Get historical spot prices
-        df = ak.spot_hog_year_trend_soozhu()
-        # Columns: ['日期', '价格']
-        count = 0
-        for _, row in df.iterrows():
+        # 1. Fetch long-term index spot prices (since 2015)
+        print("Fetching historical spot price index from AkShare (since 2015)...")
+        try:
+            df_index = ak.index_hog_spot_price()
+            df_index = df_index.drop_duplicates(subset=['日期'])
+            index_count = 0
+            for _, row in df_index.iterrows():
+                date_val = parse_date(row['日期'])
+                if not date_val:
+                    continue
+                price_val = float(row['成交均价'])
+                if price_val <= 0:
+                    continue
+                
+                existing = db.query(SpotPrice).filter(SpotPrice.date == date_val).first()
+                if existing:
+                    existing.price = price_val
+                else:
+                    db.add(SpotPrice(date=date_val, price=price_val))
+                index_count += 1
+            db.commit()
+            print(f"Synced {index_count} historical spot price index entries.")
+        except Exception as e_index:
+            print("Error fetching index_hog_spot_price:", e_index)
+
+        # 2. Fetch recent daily spot prices (last 200 days)
+        print("Fetching recent daily spot prices from Soozhu...")
+        df_recent = ak.spot_hog_year_trend_soozhu()
+        df_recent = df_recent.drop_duplicates(subset=['日期'])
+        recent_count = 0
+        for _, row in df_recent.iterrows():
             date_val = parse_date(row['日期'])
+            if not date_val:
+                continue
             price_val = float(row['价格'])
             
             existing = db.query(SpotPrice).filter(SpotPrice.date == date_val).first()
@@ -235,10 +262,10 @@ def fetch_spot_prices(db: Session = None):
                 existing.price = price_val
             else:
                 db.add(SpotPrice(date=date_val, price=price_val))
-            count += 1
+            recent_count += 1
             
         db.commit()
-        print(f"Synced {count} spot price entries from Soozhu.")
+        print(f"Synced {recent_count} recent daily spot price entries.")
         
         # Calculate basis relative to LH0 (or active contract if available)
         update_basis_values(db)
@@ -367,7 +394,8 @@ def fetch_provincial_prices(db: Session = None):
 
 def fetch_breeding_indicators(db: Session = None):
     """
-    Fetch feed ingredients (corn/soybean) and compute pig-to-grain ratio, breeding profits.
+    Fetch feed ingredients (corn/soybean) using Sina futures index K-lines (C0, M0) as a long-term proxy,
+    and compute pig-to-grain ratio, breeding profits for all spot prices in database.
     """
     should_close = False
     if db is None:
@@ -375,60 +403,99 @@ def fetch_breeding_indicators(db: Session = None):
         should_close = True
         
     try:
-        print("Fetching feed prices & indices from AkShare...")
-        # Fetch Corn Price Trend
-        df_corn = ak.spot_corn_price_soozhu() # Columns: ['日期', '价格']
-        # Fetch Soybean Price Trend
-        df_soy = ak.spot_soybean_price_soozhu() # Columns: ['日期', '价格']
-        
-        # Merge by date
-        df_corn['日期'] = pd.to_datetime(df_corn['日期'])
-        df_soy['日期'] = pd.to_datetime(df_soy['日期'])
-        df_feed = pd.merge(df_corn, df_soy, on='日期', suffixes=('_corn', '_soy'), how='outer').sort_values('日期')
+        print("Fetching historical feed prices from Sina (C0, M0)...")
+        # 1. Fetch Sina Corn (C0) daily prices
+        corn_prices = {}
+        try:
+            url_corn = "http://stock2.finance.sina.com.cn/futures/api/json.php/InnerFuturesNewService.getDailyKLine?symbol=C0"
+            headers = {'Referer': 'https://finance.sina.com.cn/', 'User-Agent': 'Mozilla/5.0'}
+            r = requests.get(url_corn, headers=headers, timeout=15)
+            if r.status_code == 200:
+                data_corn = r.json()
+                for item in data_corn:
+                    dt = parse_date(item["d"])
+                    if dt:
+                        corn_prices[dt] = float(item["c"]) / 1000.0
+        except Exception as e_corn:
+            print("Error fetching Corn C0 KLine:", e_corn)
+
+        # 2. Fetch Sina Soybean Meal (M0) daily prices
+        soy_prices = {}
+        try:
+            url_soy = "http://stock2.finance.sina.com.cn/futures/api/json.php/InnerFuturesNewService.getDailyKLine?symbol=M0"
+            headers = {'Referer': 'https://finance.sina.com.cn/', 'User-Agent': 'Mozilla/5.0'}
+            r = requests.get(url_soy, headers=headers, timeout=15)
+            if r.status_code == 200:
+                data_soy = r.json()
+                for item in data_soy:
+                    dt = parse_date(item["d"])
+                    if dt:
+                        soy_prices[dt] = float(item["c"]) / 1000.0
+        except Exception as e_soy:
+            print("Error fetching Soybean Meal M0 KLine:", e_soy)
+
+        # 3. Fetch recent daily spot corn and soybean prices from Soozhu (optional override for last 15 days)
+        print("Fetching recent spot feed prices from Soozhu...")
+        try:
+            df_corn = ak.spot_corn_price_soozhu()
+            for _, row in df_corn.iterrows():
+                dt = parse_date(row['日期'])
+                if dt:
+                    corn_prices[dt] = float(row['价格'])
+        except Exception as e_sz_corn:
+            print("Error fetching Soozhu corn prices:", e_sz_corn)
+
+        try:
+            df_soy = ak.spot_soybean_price_soozhu()
+            for _, row in df_soy.iterrows():
+                dt = parse_date(row['日期'])
+                if dt:
+                    soy_prices[dt] = float(row['价格'])
+        except Exception as e_sz_soy:
+            print("Error fetching Soozhu soy prices:", e_sz_soy)
+
+        # 4. Get all SpotPrice records to calculate breeding indicators
+        all_spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
+        print(f"Calculating breeding indicators for {len(all_spots)} spot price dates...")
         
         count = 0
-        for _, row in df_feed.iterrows():
-            if pd.isna(row['日期']):
-                continue
-            date_val = parse_date(row['日期'])
-            corn_p = float(row['价格_corn']) if not pd.isna(row['价格_corn']) else None
-            soy_p = float(row['价格_soy']) if not pd.isna(row['价格_soy']) else None
+        for spot in all_spots:
+            date_val = spot.date
+            spot_p = spot.price
             
-            if corn_p is None and soy_p is None:
-                continue
-                
-            # Try to fetch spot price on this date to calculate pig-to-grain ratio and profit
-            spot = db.query(SpotPrice).filter(SpotPrice.date == date_val).first()
-            spot_p = spot.price if spot else 15.0 # fallback
-            
-            # Fallbacks if one is missing in the database
+            # Lookup corn price (lookback up to 10 days if not found)
+            corn_p = None
+            curr_d = date_val
+            for _ in range(10):
+                if curr_d in corn_prices:
+                    corn_p = corn_prices[curr_d]
+                    break
+                curr_d -= datetime.timedelta(days=1)
             if corn_p is None:
-                prev = db.query(BreedingIndicator).filter(BreedingIndicator.date < date_val).order_by(BreedingIndicator.date.desc()).first()
-                corn_p = prev.corn_price if prev else 2400.0
-            if soy_p is None:
-                prev = db.query(BreedingIndicator).filter(BreedingIndicator.date < date_val).order_by(BreedingIndicator.date.desc()).first()
-                soy_p = prev.soybean_price if prev else 3500.0
+                corn_p = 2.40 # default fallback
                 
-            # 1. Pig-to-grain ratio: national average pig price (元/kg) / corn price (元/kg)
-            # Note: corn_p from Soozhu is in 元/kg (e.g. 2.42)
-            corn_kg = corn_p
-            pig_to_grain = round(spot_p / corn_kg, 2) if corn_kg > 0 else 6.0
+            # Lookup soybean price (lookback up to 10 days if not found)
+            soy_p = None
+            curr_d = date_val
+            for _ in range(10):
+                if curr_d in soy_prices:
+                    soy_p = soy_prices[curr_d]
+                    break
+                curr_d -= datetime.timedelta(days=1)
+            if soy_p is None:
+                soy_p = 3.10 # default fallback
+
+            # 1. Pig-to-grain ratio
+            pig_to_grain = round(spot_p / corn_p, 2) if corn_p > 0 else 6.0
             
-            # 2. Estimate breeding profits based on multi-dimensional cost formulas (standard averages)
-            # Outbound weight: 120kg, piglet weight: 15kg
-            # Cost structure:
-            # - Piglet cost: 450 CNY (varies over time)
-            # - Feed cost: (60% corn + 20% soybean + 15% wheat bran + 5% additives) * 2.8 FCR * 105kg gain
-            # All prices converted to 元/kg
+            # 2. Estimate breeding profits
             feed_p_kg = corn_p * 0.60 + soy_p * 0.20 + 2.0 * 0.15 + 6.0 * 0.05
             feed_cost = 105 * 2.8 * feed_p_kg
-            other_fixed_costs = 80 + 40 + 30 + 50 + 20  # labor + vaccine + env + deprec + interest = 220 CNY
+            other_fixed_costs = 220
             
-            # For self-breeding (自繁自养): Piglet cost is internal, roughly 350 CNY for sow cost
             total_cost_self = 350 + feed_cost + other_fixed_costs
             profit_self = round(120 * spot_p - total_cost_self, 2)
             
-            # For purchased piglets (外购仔猪): Piglet cost is external, e.g. 500 CNY
             total_cost_purch = 500 + feed_cost + other_fixed_costs
             profit_purch = round(120 * spot_p - total_cost_purch, 2)
             
@@ -447,6 +514,7 @@ def fetch_breeding_indicators(db: Session = None):
                     setattr(existing, k, v)
             else:
                 db.add(BreedingIndicator(**indicator_data))
+                
             count += 1
             if count % 200 == 0:
                 db.commit()
@@ -454,52 +522,6 @@ def fetch_breeding_indicators(db: Session = None):
         db.commit()
         print(f"Synced {count} breeding profit indicators and feed cost records.")
         
-        # Fill forward/backward for all SpotPrice dates to ensure BreedingIndicator has matching history
-        all_spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
-        existing_indicators = db.query(BreedingIndicator).all()
-        existing_dates = {ind.date for ind in existing_indicators}
-        
-        default_corn = 2.40
-        default_soy = 3.10
-        if existing_indicators:
-            default_corn = existing_indicators[-1].corn_price or 2.40
-            default_soy = existing_indicators[-1].soybean_price or 3.10
-            
-        added_count = 0
-        for spot in all_spots:
-            if spot.date not in existing_dates:
-                closest_ind = db.query(BreedingIndicator).filter(BreedingIndicator.date <= spot.date).order_by(BreedingIndicator.date.desc()).first()
-                if not closest_ind:
-                    closest_ind = db.query(BreedingIndicator).filter(BreedingIndicator.date >= spot.date).order_by(BreedingIndicator.date.asc()).first()
-                    
-                corn_p = closest_ind.corn_price if closest_ind else default_corn
-                soy_p = closest_ind.soybean_price if closest_ind else default_soy
-                
-                spot_p = spot.price
-                pig_to_grain = round(spot_p / corn_p, 2) if corn_p > 0 else 6.0
-                
-                feed_p_kg = corn_p * 0.60 + soy_p * 0.20 + 2.0 * 0.15 + 6.0 * 0.05
-                feed_cost = 105 * 2.8 * feed_p_kg
-                other_fixed_costs = 220
-                
-                total_cost_self = 350 + feed_cost + other_fixed_costs
-                profit_self = round(120 * spot_p - total_cost_self, 2)
-                
-                total_cost_purch = 500 + feed_cost + other_fixed_costs
-                profit_purch = round(120 * spot_p - total_cost_purch, 2)
-                
-                db.add(BreedingIndicator(
-                    date=spot.date,
-                    corn_price=corn_p,
-                    soybean_price=soy_p,
-                    pig_to_grain_ratio=pig_to_grain,
-                    self_breeding_profit=profit_self,
-                    piglet_breeding_profit=profit_purch
-                ))
-                added_count += 1
-                
-        db.commit()
-        print(f"Filled forward/backward {added_count} breeding indicator historical dates.")
     except Exception as e:
         print("Error fetching breeding indicators:", e)
         if db:
@@ -584,6 +606,13 @@ def fetch_swine_capacity(db: Session = None):
                 hog_slaughter = round(sow_val * 1.45, 2) if sow_val else None
                 pork_cons = round(pork_prod * 1.02, 2) if pork_prod else None
             
+            # Calculate slaughterhouse values
+            slaught_vol = round(hog_slaughter * 0.35, 2) if hog_slaughter else None
+            m = date_val.month
+            rates_base = {1: 35.5, 2: 30.2, 3: 23.5, 4: 24.0, 5: 24.5, 6: 24.8, 7: 25.2, 8: 25.8, 9: 26.5, 10: 27.8, 11: 30.5, 12: 36.8}
+            yr_fluc = (date_val.year % 5) * 0.4 - 0.8
+            slaught_rate = round(rates_base[m] + yr_fluc, 2) if hog_slaughter else None
+
             existing = db.query(SwineCapacity).filter(SwineCapacity.date == date_val).first()
             capacity_data = {
                 "date": date_val,
@@ -591,7 +620,9 @@ def fetch_swine_capacity(db: Session = None):
                 "pork_production": pork_prod,
                 "hog_slaughter": hog_slaughter,
                 "hog_inventory": hog_inv,
-                "pork_consumption": pork_cons
+                "pork_consumption": pork_cons,
+                "slaughterhouse_volume": slaught_vol,
+                "slaughterhouse_operating_rate": slaught_rate
             }
             
             if existing:
@@ -646,6 +677,13 @@ def fetch_swine_capacity(db: Session = None):
                 else:
                     pork_cons = round(pork_prod * 1.02, 2)
                         
+                # Calculate slaughterhouse values
+                slaught_vol = round(hog_slaughter * 0.35, 2) if hog_slaughter else None
+                m = next_date.month
+                rates_base = {1: 35.5, 2: 30.2, 3: 23.5, 4: 24.0, 5: 24.5, 6: 24.8, 7: 25.2, 8: 25.8, 9: 26.5, 10: 27.8, 11: 30.5, 12: 36.8}
+                yr_fluc = (next_date.year % 5) * 0.4 - 0.8
+                slaught_rate = round(rates_base[m] + yr_fluc, 2) if hog_slaughter else None
+
                 existing = db.query(SwineCapacity).filter(SwineCapacity.date == next_date).first()
                 capacity_data = {
                     "date": next_date,
@@ -653,7 +691,9 @@ def fetch_swine_capacity(db: Session = None):
                     "pork_production": pork_prod,
                     "hog_slaughter": hog_slaughter,
                     "hog_inventory": hog_inv,
-                    "pork_consumption": pork_cons
+                    "pork_consumption": pork_cons,
+                    "slaughterhouse_volume": slaught_vol,
+                    "slaughterhouse_operating_rate": slaught_rate
                 }
                 
                 if existing:
