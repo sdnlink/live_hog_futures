@@ -23,6 +23,8 @@ interface MainChartsProps {
   porkPriceData: PorkPrice[];
   costsData: BreedingIndicator[];
   capacityData: SwineCapacity[];
+  weeklyCapacityData: SwineCapacity[];
+  dailyCapacityData: SwineCapacity[];
   frozenPorkData: FrozenPorkStorage[];
   selectedSymbol: string;
   filterByTimeRange: <T extends { date: string }>(data: T[]) => T[];
@@ -51,10 +53,13 @@ const MainCharts: React.FC<MainChartsProps> = ({
   porkPriceData,
   costsData,
   capacityData,
+  weeklyCapacityData,
+  dailyCapacityData,
   frozenPorkData,
   selectedSymbol,
   filterByTimeRange
 }) => {
+  const [granularity, setGranularity] = React.useState<'daily' | 'weekly' | 'monthly'>('daily');
   if (activeChartTab === 'spot-futures') {
     return (
       <ResponsiveContainer width="100%" height="100%">
@@ -132,52 +137,97 @@ const MainCharts: React.FC<MainChartsProps> = ({
   }
 
   if (activeChartTab === 'capacity') {
+    let activeData = granularity === 'daily' ? dailyCapacityData : granularity === 'weekly' ? weeklyCapacityData : capacityData;
+    
+    // 1. Filter by time range first
+    activeData = filterByTimeRange(activeData);
+    
+    // 2. Dynamically downsample if data is too dense to prevent SVG rendering bottlenecks (6000+ points)
+    if (activeData.length > 300) {
+      const step = Math.ceil(activeData.length / 300);
+      activeData = activeData.filter((_, idx) => idx % step === 0);
+    }
+    
+    const granularityText = granularity === 'daily' ? '(日度)' : granularity === 'weekly' ? '(周度)' : '(月度)';
     return (
       <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px', marginBottom: '-8px' }}>
+          <div style={{
+            display: 'inline-flex',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '6px',
+            padding: '2px',
+            gap: '2px'
+          }}>
+            {(['daily', 'weekly', 'monthly'] as const).map(g => (
+              <button
+                key={g}
+                onClick={() => setGranularity(g)}
+                style={{
+                  padding: '4px 14px',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  background: granularity === g ? 'var(--color-accent)' : 'transparent',
+                  color: granularity === g ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {g === 'daily' ? '日度数据' : g === 'weekly' ? '周度数据' : '月度数据'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            生猪产能、存栏与定点屠宰场趋势
+            生猪产能、存栏与定点屠宰场趋势 {granularityText}
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={filterByTimeRange(capacityData)}
+                data={activeData}
                 margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis yAxisId="left" stroke="var(--text-muted)" domain={['dataMin - 100', 'dataMax + 100']} fontSize={10} label={{ value: '产能与屠宰量 (万头)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" domain={['dataMin - 100', 'dataMax + 100']} fontSize={10} label={{ value: granularity === 'daily' ? '产能与定点屠宰量 (日度, 万头)' : granularity === 'weekly' ? '产能与定点屠宰量 (周度, 万头)' : '产能与定点屠宰量 (月度, 万头)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
                 <YAxis yAxisId="right-inventory" orientation="right" stroke="var(--text-muted)" domain={['dataMin - 1000', 'dataMax + 1000']} fontSize={10} label={{ value: '生猪存栏 (万头)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
                 <YAxis yAxisId="right-rate" orientation="right" stroke="var(--text-muted)" domain={[0, 100]} fontSize={10} hide={true} />
                 <Tooltip content={<CustomChartTooltip />} />
                 <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
                 <Line yAxisId="left" name="能繁母猪存栏" type="monotone" dataKey="maternal_sow_inventory" stroke="var(--color-accent)" strokeWidth={2.5} dot={false} connectNulls />
-                <Line yAxisId="left" name="定点屠宰量" type="monotone" dataKey="slaughterhouse_volume" stroke="rgb(233, 30, 99)" strokeWidth={2.5} dot={false} connectNulls />
+                <Line yAxisId="left" name={granularity === 'daily' ? "定点屠宰量 (日度)" : granularity === 'weekly' ? "定点屠宰量 (周度)" : "定点屠宰量 (月度)"} type="monotone" dataKey="slaughterhouse_volume" stroke="rgb(233, 30, 99)" strokeWidth={2.5} dot={false} connectNulls />
                 <Line yAxisId="right-inventory" name="生猪存栏" type="monotone" dataKey="hog_inventory" stroke="rgb(103, 58, 183)" strokeWidth={2.5} dot={false} connectNulls />
                 <Line yAxisId="right-rate" name="屠宰开工率" type="monotone" dataKey="slaughterhouse_operating_rate" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
+
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            猪肉产量与消费端消费量对比
+            猪肉产量与消费端消费量对比 {granularityText}
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={filterByTimeRange(capacityData)}
+                data={activeData}
                 margin={{ top: 10, right: 50, bottom: 5, left: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '猪肉量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '出栏量 (万头)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: granularity === 'daily' ? '日度猪肉量 (万吨)' : granularity === 'weekly' ? '周度猪肉量 (万吨)' : '月度猪肉量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: granularity === 'daily' ? '日度出栏量 (万头)' : granularity === 'weekly' ? '周度出栏量 (万头)' : '月度出栏量 (万头)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
                 <Tooltip content={<CustomChartTooltip />} />
                 <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                <Line yAxisId="left" name="猪肉产量 (供给)" type="monotone" dataKey="pork_production" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
-                <Line yAxisId="left" name="猪肉消费量 (消费)" type="monotone" dataKey="pork_consumption" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
-                <Line yAxisId="right" name="生猪出栏量" type="monotone" dataKey="hog_slaughter" stroke="rgb(0, 188, 212)" strokeWidth={2} dot={false} strokeDasharray="5 3" connectNulls />
+                <Line yAxisId="left" name={granularity === 'daily' ? "猪肉产量 (供给, 日度)" : granularity === 'weekly' ? "猪肉产量 (供给, 周度)" : "猪肉产量 (供给, 月度)"} type="monotone" dataKey="pork_production" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
+                <Line yAxisId="left" name={granularity === 'daily' ? "猪肉消费量 (消费, 日度)" : granularity === 'weekly' ? "猪肉消费量 (消费, 周度)" : "猪肉消费量 (消费, 月度)"} type="monotone" dataKey="pork_consumption" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
+                <Line yAxisId="right" name={granularity === 'daily' ? "生猪出栏量 (日度)" : granularity === 'weekly' ? "生猪出栏量 (周度)" : "生猪出栏量 (月度)"} type="monotone" dataKey="hog_slaughter" stroke="rgb(0, 188, 212)" strokeWidth={2} dot={false} strokeDasharray="5 3" connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </div>

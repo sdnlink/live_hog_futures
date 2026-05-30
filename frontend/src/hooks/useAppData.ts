@@ -27,6 +27,8 @@ export const useAppData = (selectedSymbol: string) => {
   const [porkPriceData, setPorkPriceData] = useState<PorkPrice[]>([]);
   const [provPrices, setProvPrices] = useState<ProvincialPrice[]>([]);
   const [capacityData, setCapacityData] = useState<SwineCapacity[]>([]);
+  const [weeklyCapacityData, setWeeklyCapacityData] = useState<SwineCapacity[]>([]);
+  const [dailyCapacityData, setDailyCapacityData] = useState<SwineCapacity[]>([]);
   const [costsData, setCostsData] = useState<BreedingIndicator[]>([]);
   const [epidemicReports, setEpidemicReports] = useState<EpidemicReport[]>([]);
   const [sentimentIndex, setSentimentIndex] = useState<SentimentIndex[]>([]);
@@ -55,10 +57,12 @@ export const useAppData = (selectedSymbol: string) => {
   const fetchStaticData = useCallback(async () => {
     try {
       setErrorMsg('');
-      const [spotRes, provRes, capRes, costRes, epiRes, porkRes, stockRes, frozenRes] = await Promise.all([
+      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, frozenRes] = await Promise.all([
         fetch(`${BASE_URL}/api/spot/basis`),
         fetch(`${BASE_URL}/api/spot/provincial`),
-        fetch(`${BASE_URL}/api/fundamentals/capacity`),
+        fetch(`${BASE_URL}/api/fundamentals/capacity?granularity=monthly`),
+        fetch(`${BASE_URL}/api/fundamentals/capacity?granularity=weekly`),
+        fetch(`${BASE_URL}/api/fundamentals/capacity?granularity=daily`),
         fetch(`${BASE_URL}/api/fundamentals/costs`),
         fetch(`${BASE_URL}/api/epidemic/status`),
         fetch(`${BASE_URL}/api/spot/pork`),
@@ -66,13 +70,15 @@ export const useAppData = (selectedSymbol: string) => {
         fetch(`${BASE_URL}/api/fundamentals/frozen_pork`),
       ]);
 
-      if (!spotRes.ok || !provRes.ok || !capRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !frozenRes.ok) {
+      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !frozenRes.ok) {
         throw new Error('Failed to retrieve macro fundamental data from backend.');
       }
 
       setSpotBasisData(await spotRes.json());
       setProvPrices(await provRes.json());
       setCapacityData(await capRes.json());
+      setWeeklyCapacityData(await weeklyCapRes.json());
+      setDailyCapacityData(await dailyCapRes.json());
       setCostsData(await costRes.json());
       const epidemicStatus = await epiRes.json();
       setEpidemicReports(epidemicStatus.reports);
@@ -200,6 +206,8 @@ export const useAppData = (selectedSymbol: string) => {
     porkPriceData,
     provPrices,
     capacityData,
+    weeklyCapacityData,
+    dailyCapacityData,
     costsData,
     epidemicReports,
     sentimentIndex,

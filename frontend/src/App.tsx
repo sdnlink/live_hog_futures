@@ -21,6 +21,8 @@ function App() {
     porkPriceData,
     provPrices,
     capacityData,
+    weeklyCapacityData,
+    dailyCapacityData,
     costsData,
     epidemicReports,
     sentimentIndex,
@@ -250,6 +252,7 @@ function App() {
                 <MainCharts 
                   activeChartTab={activeChartTab} spotBasisData={spotBasisData} klineData={klineData}
                   porkPriceData={porkPriceData} costsData={costsData} capacityData={capacityData}
+                  weeklyCapacityData={weeklyCapacityData} dailyCapacityData={dailyCapacityData}
                   frozenPorkData={frozenPorkData}
                   selectedSymbol={selectedSymbol} filterByTimeRange={filterByTimeRange}
                 />

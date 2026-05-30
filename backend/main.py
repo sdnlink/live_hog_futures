@@ -150,11 +150,99 @@ def get_provincial_prices(db: Session = Depends(get_db)):
     ).order_by(ProvincialPrice.price.desc()).all()
     return prices
 
+def interpolate_swine_capacity(records: List[SwineCapacity], granularity: str = "monthly") -> List[Dict[str, Any]]:
+    if granularity == "monthly" or len(records) < 2:
+        return [
+            {
+                "id": r.id,
+                "date": r.date,
+                "maternal_sow_inventory": r.maternal_sow_inventory,
+                "pork_production": r.pork_production,
+                "hog_slaughter": r.hog_slaughter,
+                "hog_inventory": r.hog_inventory,
+                "pork_consumption": r.pork_consumption,
+                "slaughterhouse_volume": r.slaughterhouse_volume,
+                "slaughterhouse_operating_rate": r.slaughterhouse_operating_rate,
+            }
+            for r in records
+        ]
+
+    start_date = records[0].date
+    end_date = records[-1].date
+
+    # Determine step size and date alignment
+    if granularity == "weekly":
+        days_to_friday = (4 - start_date.weekday()) % 7
+        current_date = start_date + datetime.timedelta(days=days_to_friday)
+        step_days = 7
+        flow_scale = 7.0 / 30.4
+    else:  # daily
+        current_date = start_date
+        step_days = 1
+        flow_scale = 1.0 / 30.4
+
+    interp_records = []
+    idx = 1
+    
+    while current_date <= end_date:
+        rec_before = None
+        rec_after = None
+        for i in range(len(records)):
+            if records[i].date <= current_date:
+                rec_before = records[i]
+            if records[i].date >= current_date:
+                rec_after = records[i]
+                break
+
+        if not rec_before or not rec_after:
+            current_date += datetime.timedelta(days=step_days)
+            continue
+
+        if rec_before.date == rec_after.date:
+            t = 0.0
+        else:
+            total_days = (rec_after.date - rec_before.date).days
+            passed_days = (current_date - rec_before.date).days
+            t = float(passed_days) / float(total_days)
+
+        def interp(val_b, val_a, is_flow=False):
+            if val_b is None or val_a is None:
+                val = val_b if val_b is not None else val_a
+            else:
+                val = val_b + t * (val_a - val_b)
+            
+            if val is not None:
+                if is_flow:
+                    val = val * flow_scale
+                return round(val, 2)
+            return None
+
+        rec = {
+            "id": idx,
+            "date": current_date,
+            "maternal_sow_inventory": interp(rec_before.maternal_sow_inventory, rec_after.maternal_sow_inventory, False),
+            "pork_production": interp(rec_before.pork_production, rec_after.pork_production, True),
+            "hog_slaughter": interp(rec_before.hog_slaughter, rec_after.hog_slaughter, True),
+            "hog_inventory": interp(rec_before.hog_inventory, rec_after.hog_inventory, False),
+            "pork_consumption": interp(rec_before.pork_consumption, rec_after.pork_consumption, True),
+            "slaughterhouse_volume": interp(rec_before.slaughterhouse_volume, rec_after.slaughterhouse_volume, True),
+            "slaughterhouse_operating_rate": interp(rec_before.slaughterhouse_operating_rate, rec_after.slaughterhouse_operating_rate, False),
+        }
+        interp_records.append(rec)
+        idx += 1
+        current_date += datetime.timedelta(days=step_days)
+
+    return interp_records
+
 @app.get("/api/fundamentals/capacity", response_model=List[schemas.SwineCapacityOut])
-def get_swine_capacity(db: Session = Depends(get_db)):
-    """Get monthly swine inventory and production capacity indicators"""
+def get_swine_capacity(granularity: str = "monthly", db: Session = Depends(get_db)):
+    """Get monthly, weekly or daily swine inventory and production capacity indicators"""
     capacity = db.query(SwineCapacity).order_by(SwineCapacity.date.asc()).all()
+    if granularity in ("weekly", "daily"):
+        return interpolate_swine_capacity(capacity, granularity)
     return capacity
+
+
 
 @app.get("/api/fundamentals/costs", response_model=List[schemas.BreedingIndicatorOut])
 def get_breeding_costs_and_profits(db: Session = Depends(get_db)):
