@@ -127,3 +127,46 @@ class ExpertAdviceOut(BaseModel):
     warning_level: str
     conclusion: Dict[str, Any]
     advice: Dict[str, Any]
+
+class StockKlineOut(BaseModel):
+    id: int
+    symbol: str
+    name: str
+    date: date
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+    class Config:
+        from_attributes = True
+
+class StockQuoteOut(BaseModel):
+    id: int
+    symbol: str
+    name: str
+    open: float
+    high: float
+    low: float
+    last_price: float
+    yesterday_close: float
+    volume: float
+    amount: float
+    date: date
+    time: str
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class FrozenPorkStorageOut(BaseModel):
+    id: int
+    date: date
+    reserve_volume: Optional[float] = None
+    commercial_inventory: Optional[float] = None
+    storage_rate: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+

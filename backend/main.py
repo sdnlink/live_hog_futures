@@ -7,14 +7,15 @@ from typing import List, Dict, Any
 from .database import engine, Base, get_db
 from .models import (
     FuturesQuote, FuturesKline, SpotPrice, ProvincialPrice,
-    BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice
+    BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice,
+    StockKline, StockQuote, FrozenPorkStorage
 )
 from . import schemas
 from .scraper import (
     fetch_live_futures, LH_CONTRACTS, fetch_spot_prices,
     fetch_provincial_prices, fetch_breeding_indicators,
     fetch_swine_capacity, fetch_sentiment_radar, fetch_historical_kline,
-    fetch_pork_prices
+    fetch_pork_prices, fetch_live_stocks, fetch_stock_klines, fetch_frozen_pork_storage
 )
 from .scheduler import start_scheduler, stop_scheduler
 from .yijing import generate_yijing_forecast
@@ -91,6 +92,11 @@ def trigger_data_sync(db: Session = Depends(get_db)):
         fetch_historical_kline("LH0", db)
         for symbol in LH_CONTRACTS:
             fetch_historical_kline(symbol, db)
+            
+        # 8. Stocks & Frozen Pork
+        fetch_stock_klines(db)
+        fetch_live_stocks(db)
+        fetch_frozen_pork_storage(db)
             
         return {"status": "success", "message": "All data synchronized successfully!"}
     except Exception as e:
@@ -173,6 +179,28 @@ def get_epidemic_status(db: Session = Depends(get_db)):
         "reports": reports,
         "sentiment": sentiment
     }
+
+@app.get("/api/stocks/trends", response_model=List[schemas.StockKlineOut])
+def get_stock_trends(db: Session = Depends(get_db)):
+    """Get historical stock prices for listed hog companies"""
+    trends = db.query(StockKline).order_by(StockKline.date.asc()).all()
+    return trends
+
+@app.get("/api/stocks/realtime", response_model=List[schemas.StockQuoteOut])
+def get_realtime_stocks(db: Session = Depends(get_db)):
+    """Get real-time quotes of listed hog companies"""
+    quotes = db.query(StockQuote).order_by(StockQuote.symbol).all()
+    # If empty, do a quick sync
+    if not quotes:
+        fetch_live_stocks(db)
+        quotes = db.query(StockQuote).order_by(StockQuote.symbol).all()
+    return quotes
+
+@app.get("/api/fundamentals/frozen_pork", response_model=List[schemas.FrozenPorkStorageOut])
+def get_frozen_pork_storage(db: Session = Depends(get_db)):
+    """Get historical frozen pork storage and reserve levels"""
+    storage = db.query(FrozenPorkStorage).order_by(FrozenPorkStorage.date.asc()).all()
+    return storage
 
 @app.get("/api/expert/advice", response_model=schemas.ExpertAdviceOut)
 def get_expert_advice(symbol: str = "LH0", db: Session = Depends(get_db)):

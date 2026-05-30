@@ -5,6 +5,7 @@ import {
   Area,
   ComposedChart,
   Line,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,7 +14,7 @@ import {
   ReferenceLine,
   LineChart
 } from 'recharts';
-import type { FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator } from '../types';
+import type { FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator, FrozenPorkStorage } from '../types';
 
 interface MainChartsProps {
   activeChartTab: string;
@@ -22,6 +23,7 @@ interface MainChartsProps {
   porkPriceData: PorkPrice[];
   costsData: BreedingIndicator[];
   capacityData: SwineCapacity[];
+  frozenPorkData: FrozenPorkStorage[];
   selectedSymbol: string;
   filterByTimeRange: <T extends { date: string }>(data: T[]) => T[];
 }
@@ -49,6 +51,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
   porkPriceData,
   costsData,
   capacityData,
+  frozenPorkData,
   selectedSymbol,
   filterByTimeRange
 }) => {
@@ -176,6 +179,60 @@ const MainCharts: React.FC<MainChartsProps> = ({
                 <Line yAxisId="left" name="猪肉消费量 (消费)" type="monotone" dataKey="pork_consumption" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
                 <Line yAxisId="right" name="生猪出栏量" type="monotone" dataKey="hog_slaughter" stroke="rgb(0, 188, 212)" strokeWidth={2} dot={false} strokeDasharray="5 3" connectNulls />
               </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeChartTab === 'frozen-pork') {
+    return (
+      <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            中央储备冻品投放与商业库存走势
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={filterByTimeRange(frozenPorkData)}
+                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis stroke="var(--text-muted)" fontSize={10} label={{ value: '冻品数量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Line name="商业冻猪肉库存" type="monotone" dataKey="commercial_inventory" stroke="var(--color-accent)" strokeWidth={2.5} dot={false} connectNulls />
+                <Bar name="储备冻肉投放/收储量" dataKey="reserve_volume" fill="var(--color-down)" radius={[4, 4, 0, 0]} maxBarSize={15} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            全国商业冻品库容率趋势
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={filterByTimeRange(frozenPorkData)}
+                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+              >
+                <defs>
+                  <linearGradient id="colorStorageRate" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-warn)" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="var(--color-warn)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis stroke="var(--text-muted)" domain={[0, 100]} fontSize={10} label={{ value: '库容率 (%)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Area name="商业冻品库容率" type="monotone" dataKey="storage_rate" stroke="var(--color-warn)" fillOpacity={1} fill="url(#colorStorageRate)" strokeWidth={2} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>

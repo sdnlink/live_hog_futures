@@ -10,7 +10,10 @@ import type {
   EpidemicReport,
   SentimentIndex,
   ExpertAdvice,
-  YijingForecast
+  YijingForecast,
+  StockKline,
+  StockQuote,
+  FrozenPorkStorage
 } from '../types';
 
 const BASE_URL = '/sys1';
@@ -29,6 +32,10 @@ export const useAppData = (selectedSymbol: string) => {
   const [sentimentIndex, setSentimentIndex] = useState<SentimentIndex[]>([]);
   const [expertAdvice, setExpertAdvice] = useState<ExpertAdvice | null>(null);
   const [yijingForecast, setYijingForecast] = useState<YijingForecast | null>(null);
+  
+  const [stockData, setStockData] = useState<StockKline[]>([]);
+  const [stockQuotes, setStockQuotes] = useState<StockQuote[]>([]);
+  const [frozenPorkData, setFrozenPorkData] = useState<FrozenPorkStorage[]>([]);
 
   // Status States
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -48,16 +55,18 @@ export const useAppData = (selectedSymbol: string) => {
   const fetchStaticData = useCallback(async () => {
     try {
       setErrorMsg('');
-      const [spotRes, provRes, capRes, costRes, epiRes, porkRes] = await Promise.all([
+      const [spotRes, provRes, capRes, costRes, epiRes, porkRes, stockRes, frozenRes] = await Promise.all([
         fetch(`${BASE_URL}/api/spot/basis`),
         fetch(`${BASE_URL}/api/spot/provincial`),
         fetch(`${BASE_URL}/api/fundamentals/capacity`),
         fetch(`${BASE_URL}/api/fundamentals/costs`),
         fetch(`${BASE_URL}/api/epidemic/status`),
         fetch(`${BASE_URL}/api/spot/pork`),
+        fetch(`${BASE_URL}/api/stocks/trends`),
+        fetch(`${BASE_URL}/api/fundamentals/frozen_pork`),
       ]);
 
-      if (!spotRes.ok || !provRes.ok || !capRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok) {
+      if (!spotRes.ok || !provRes.ok || !capRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !frozenRes.ok) {
         throw new Error('Failed to retrieve macro fundamental data from backend.');
       }
 
@@ -69,6 +78,8 @@ export const useAppData = (selectedSymbol: string) => {
       setEpidemicReports(epidemicStatus.reports);
       setSentimentIndex(epidemicStatus.sentiment);
       setPorkPriceData(await porkRes.json());
+      setStockData(await stockRes.json());
+      setFrozenPorkData(await frozenRes.json());
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || '网络连接异常，未能获取基本面数据');
@@ -89,15 +100,17 @@ export const useAppData = (selectedSymbol: string) => {
     try {
       setIsRealtimePolling(true);
       const symbol = selectedSymbolRef.current;
-      const [quotesRes, adviceRes] = await Promise.all([
+      const [quotesRes, adviceRes, stockQuotesRes] = await Promise.all([
         fetch(`${BASE_URL}/api/futures/realtime`),
         fetch(`${BASE_URL}/api/expert/advice?symbol=${symbol}`),
+        fetch(`${BASE_URL}/api/stocks/realtime`),
       ]);
 
-      if (!quotesRes.ok || !adviceRes.ok) throw new Error('Failed to synchronize real-time futures quotes.');
+      if (!quotesRes.ok || !adviceRes.ok || !stockQuotesRes.ok) throw new Error('Failed to synchronize real-time quotes.');
 
       setQuotes(await quotesRes.json());
       setExpertAdvice(await adviceRes.json());
+      setStockQuotes(await stockQuotesRes.json());
       setLastSyncTime(new Date().toLocaleTimeString());
     } catch (err: any) {
       console.error(err);
@@ -192,6 +205,9 @@ export const useAppData = (selectedSymbol: string) => {
     sentimentIndex,
     expertAdvice,
     yijingForecast,
+    stockData,
+    stockQuotes,
+    frozenPorkData,
     isLoading,
     isRealtimePolling,
     isManualSyncing,

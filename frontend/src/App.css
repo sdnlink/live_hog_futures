@@ -689,7 +689,7 @@
 
 .dashboard-bottom-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1.3fr;
   gap: 16px;
 }
 

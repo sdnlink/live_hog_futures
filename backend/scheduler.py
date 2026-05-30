@@ -6,7 +6,8 @@ from .database import SessionLocal
 from .scraper import (
     fetch_live_futures, fetch_spot_prices, fetch_provincial_prices,
     fetch_breeding_indicators, fetch_swine_capacity, fetch_sentiment_radar,
-    LH_CONTRACTS, fetch_historical_kline, fetch_pork_prices
+    LH_CONTRACTS, fetch_historical_kline, fetch_pork_prices,
+    fetch_live_stocks, fetch_stock_klines, fetch_frozen_pork_storage
 )
 
 # Global flag to control scheduler
@@ -26,6 +27,20 @@ def is_trading_hours():
     
     return (morning_start <= current_time <= morning_end) or (afternoon_start <= current_time <= afternoon_end)
 
+def is_stock_trading_hours():
+    """A-share stock trading hours: Mon-Fri 09:30-11:30, 13:00-15:00"""
+    now = datetime.datetime.now()
+    if now.weekday() > 4:  # Saturday & Sunday
+        return False
+        
+    current_time = now.time()
+    morning_start = datetime.time(9, 30, 0)
+    morning_end = datetime.time(11, 30, 0)
+    afternoon_start = datetime.time(13, 0, 0)
+    afternoon_end = datetime.time(15, 0, 0)
+    
+    return (morning_start <= current_time <= morning_end) or (afternoon_start <= current_time <= afternoon_end)
+
 def realtime_scheduler_loop():
     """Task running every 10 seconds during trading hours to fetch live quotes"""
     global _running
@@ -37,6 +52,9 @@ def realtime_scheduler_loop():
             if is_trading_hours():
                 # print("Trading hours: updating real-time quotes...")
                 fetch_live_futures(db)
+            if is_stock_trading_hours():
+                # print("Stock trading hours: updating real-time stock quotes...")
+                fetch_live_stocks(db)
             # Sleep 15 seconds
             time.sleep(15)
         except Exception as e:
@@ -73,6 +91,11 @@ def daily_scheduler_loop():
                 fetch_historical_kline("LH0", db)
                 for symbol in LH_CONTRACTS:
                     fetch_historical_kline(symbol, db)
+                
+                # Sync stock and frozen pork storage
+                fetch_stock_klines(db)
+                fetch_live_stocks(db)
+                fetch_frozen_pork_storage(db)
                     
                 last_update_date = now.date()
                 print("Daily macro updates completed.")
@@ -128,6 +151,12 @@ def random_sync_scheduler_loop():
                 fetch_historical_kline("LH0", db)
                 for symbol in LH_CONTRACTS:
                     fetch_historical_kline(symbol, db)
+                
+                # 8. Stock & Frozen Pork
+                fetch_stock_klines(db)
+                fetch_live_stocks(db)
+                fetch_frozen_pork_storage(db)
+                
                 print("Automatic background full synchronization completed successfully.")
             except Exception as ex:
                 print("Error during background full synchronization:", ex)

@@ -9,7 +9,8 @@ from backend.database import SessionLocal
 from backend.scraper import (
     fetch_historical_kline, fetch_spot_prices, fetch_provincial_prices,
     fetch_breeding_indicators, fetch_swine_capacity, fetch_epidemic_reports,
-    fetch_sentiment_radar, LH_CONTRACTS, fetch_pork_prices
+    fetch_sentiment_radar, LH_CONTRACTS, fetch_pork_prices,
+    fetch_stock_klines, fetch_live_stocks, fetch_frozen_pork_storage
 )
 
 def run_seeding():
@@ -52,6 +53,18 @@ def run_seeding():
     # 8. Sentiment Indices
     print("\n8. Seeding news sentiment radar...")
     fetch_sentiment_radar(db)
+    
+    # 9. Stock historical trends
+    print("\n9. Fetching historical A-share stock prices for listed hog companies...")
+    fetch_stock_klines(db)
+
+    # 10. Stock real-time quotes
+    print("\n10. Fetching real-time stock quotes...")
+    fetch_live_stocks(db)
+
+    # 11. Frozen pork storage data
+    print("\n11. Fetching frozen pork reserves and storage capacity...")
+    fetch_frozen_pork_storage(db)
     
     print("\n=================== Seeding Completed Successfully! ===================")
     db.close()

@@ -26,6 +26,9 @@ function App() {
     sentimentIndex,
     expertAdvice,
     yijingForecast,
+    stockData,
+    stockQuotes,
+    frozenPorkData,
     isLoading,
     isManualSyncing,
     isYijingLoading,
@@ -37,6 +40,7 @@ function App() {
   } = useAppData(selectedSymbol);
 
   // UI Interactive States
+  const [activePage, setActivePage] = useState<'terminal' | 'macro-stocks'>('terminal');
   const [activeChartTab, setActiveChartTab] = useState<string>('spot-futures');
   const [activeAdviceTab, setActiveAdviceTab] = useState<'farmers' | 'middle' | 'traders'>('farmers');
   const [timeRange, setTimeRange] = useState<'30d' | '90d' | '180d' | 'all'>('all');
@@ -190,57 +194,86 @@ function App() {
         </div>
       </header>
 
-      <KpiDashboard expertAdvice={expertAdvice} selectedSymbol={selectedSymbol} />
+      {/* Main Page Navigation Selector */}
+      <div className="chart-tabs-bar" style={{ display: 'inline-flex', marginTop: '16px', gap: '8px', padding: '4px' }}>
+        <button 
+          className={`tab-btn ${activePage === 'terminal' ? 'active' : ''}`} 
+          onClick={() => setActivePage('terminal')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Activity size={16} />
+          <span>期现决策终端</span>
+        </button>
+        <button 
+          className={`tab-btn ${activePage === 'macro-stocks' ? 'active' : ''}`} 
+          onClick={() => setActivePage('macro-stocks')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Layers size={16} />
+          <span>宏观与上市公司股票看板</span>
+        </button>
+      </div>
 
-      <section className="main-dashboard-grid">
-        <FuturesTable quotes={quotes} selectedSymbol={selectedSymbol} onSymbolSelect={handleSymbolSelect} />
+      {activePage === 'terminal' ? (
+        <>
+          <KpiDashboard expertAdvice={expertAdvice} selectedSymbol={selectedSymbol} />
 
-        <article className="glass-panel" style={{ minWidth: 0 }}>
-          <div className="panel-title-bar" style={{ marginBottom: '8px' }}>
-            <div className="chart-tabs-bar">
-              {['spot-futures', 'basis', 'cost-profits', 'capacity', 'calculator', 'yijing'].map(tab => (
-                <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); }}>
-                  {tab === 'spot-futures' ? '期现收敛' : tab === 'basis' ? '历史基差' : tab === 'cost-profits' ? '养殖成本利润' : tab === 'capacity' ? '生猪产能' : tab === 'calculator' ? '成本计算器' : '☯ 易卦决策'}
-                </button>
-              ))}
+          <section className="main-dashboard-grid">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <FuturesTable quotes={quotes} selectedSymbol={selectedSymbol} onSymbolSelect={handleSymbolSelect} />
             </div>
-            {activeChartTab !== 'calculator' && (
-              <div className="time-range-selector">
-                {(['30d', '90d', '180d', 'all'] as const).map(range => (
-                  <button key={range} onClick={() => setTimeRange(range)} className={timeRange === range ? 'active' : ''}>{range === 'all' ? '全部' : `${range.slice(0, -1)}天`}</button>
-                ))}
+
+            <article className="glass-panel" style={{ minWidth: 0 }}>
+              <div className="panel-title-bar" style={{ marginBottom: '8px' }}>
+                <div className="chart-tabs-bar">
+                  {['spot-futures', 'basis', 'cost-profits', 'capacity', 'frozen-pork', 'calculator', 'yijing'].map(tab => (
+                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); }}>
+                      {tab === 'spot-futures' ? '期现收敛' : tab === 'basis' ? '历史基差' : tab === 'cost-profits' ? '养殖成本利润' : tab === 'capacity' ? '生猪产能' : tab === 'frozen-pork' ? '冻品仓储' : tab === 'calculator' ? '成本计算器' : '☯ 易卦决策'}
+                    </button>
+                  ))}
+                </div>
+                {activeChartTab !== 'calculator' && (
+                  <div className="time-range-selector">
+                    {(['30d', '90d', '180d', 'all'] as const).map(range => (
+                      <button key={range} onClick={() => setTimeRange(range)} className={timeRange === range ? 'active' : ''}>{range === 'all' ? '全部' : `${range.slice(0, -1)}天`}</button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="chart-viewport" style={
-            activeChartTab === 'capacity' ? { height: '820px' } : 
-            activeChartTab === 'yijing' ? { height: 'auto', minHeight: '1000px' } : 
-            activeChartTab === 'calculator' ? { height: 'auto', minHeight: '480px' } : 
-            undefined
-          }>
-            <MainCharts 
-              activeChartTab={activeChartTab} spotBasisData={spotBasisData} klineData={klineData}
-              porkPriceData={porkPriceData} costsData={costsData} capacityData={capacityData}
-              selectedSymbol={selectedSymbol} filterByTimeRange={filterByTimeRange}
-            />
-            {activeChartTab === 'calculator' && (
-              <BreedingCalculator 
-                calcInputs={calcInputs} calcResults={calcResults} 
-                handleInputChange={(f,v)=>setCalcInputs(p=>({...p,[f]:v}))}
-                saveCalculatorConfig={() => {}} exportCalculatorReport={() => {}} resetCalculatorConfig={() => {}}
-              />
-            )}
-            {activeChartTab === 'yijing' && (
-              <YijingPanel yijingForecast={yijingForecast} isYijingLoading={isYijingLoading} fetchYijingForecast={fetchYijingForecast} />
-            )}
-          </div>
-        </article>
+              <div className="chart-viewport" style={
+                activeChartTab === 'capacity' || activeChartTab === 'frozen-pork' ? { height: '820px' } : 
+                activeChartTab === 'yijing' ? { height: 'auto', minHeight: '1000px' } : 
+                activeChartTab === 'calculator' ? { height: 'auto', minHeight: '480px' } : 
+                undefined
+              }>
+                <MainCharts 
+                  activeChartTab={activeChartTab} spotBasisData={spotBasisData} klineData={klineData}
+                  porkPriceData={porkPriceData} costsData={costsData} capacityData={capacityData}
+                  frozenPorkData={frozenPorkData}
+                  selectedSymbol={selectedSymbol} filterByTimeRange={filterByTimeRange}
+                />
+                {activeChartTab === 'calculator' && (
+                  <BreedingCalculator 
+                    calcInputs={calcInputs} calcResults={calcResults} 
+                    handleInputChange={(f,v)=>setCalcInputs(p=>({...p,[f]:v}))}
+                    saveCalculatorConfig={() => {}} exportCalculatorReport={() => {}} resetCalculatorConfig={() => {}}
+                  />
+                )}
+                {activeChartTab === 'yijing' && (
+                  <YijingPanel yijingForecast={yijingForecast} isYijingLoading={isYijingLoading} fetchYijingForecast={fetchYijingForecast} />
+                )}
+              </div>
+            </article>
 
-        <ExpertPanel expertAdvice={expertAdvice} activeAdviceTab={activeAdviceTab} setActiveAdviceTab={setActiveAdviceTab} />
-      </section>
-
-      <BottomDashboard provPrices={provPrices} epidemicReports={epidemicReports} sentimentIndex={sentimentIndex} />
+            <ExpertPanel expertAdvice={expertAdvice} activeAdviceTab={activeAdviceTab} setActiveAdviceTab={setActiveAdviceTab} />
+          </section>
+        </>
+      ) : (
+        <div style={{ marginTop: '16px' }}>
+          <BottomDashboard provPrices={provPrices} epidemicReports={epidemicReports} sentimentIndex={sentimentIndex} stockData={stockData} stockQuotes={stockQuotes} isFullPage={true} />
+        </div>
+      )}
     </div>
   );
 }

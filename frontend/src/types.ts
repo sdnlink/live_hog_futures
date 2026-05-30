@@ -94,6 +94,42 @@ export interface SentimentIndex {
   sentiment_score: number;
 }
 
+export interface StockKline {
+  id: number;
+  symbol: string;
+  name: string;
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface StockQuote {
+  id: number;
+  symbol: string;
+  name: string;
+  open: number;
+  high: number;
+  low: number;
+  last_price: number;
+  yesterday_close: number;
+  volume: number;
+  amount: number;
+  date: string;
+  time: string;
+  updated_at: string;
+}
+
+export interface FrozenPorkStorage {
+  id: number;
+  date: string;
+  reserve_volume: number | null;
+  commercial_inventory: number | null;
+  storage_rate: number | null;
+}
+
 // ─── 易经交叉决策系统类型 ───
 export interface YijingGua {
   ben_gua: string;

@@ -116,3 +116,47 @@ class SentimentIndex(Base):
     __table_args__ = (
         Index('idx_keyword_date', 'keyword', 'date', unique=True),
     )
+
+class StockKline(Base):
+    __tablename__ = "stock_klines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String(20), index=True)                # e.g., 002714
+    name = Column(String(50))                              # e.g., 牧原股份
+    date = Column(Date, index=True)
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    close = Column(Float)
+    volume = Column(Float)
+
+    __table_args__ = (
+        Index('idx_stock_symbol_date', 'symbol', 'date', unique=True),
+    )
+
+class StockQuote(Base):
+    __tablename__ = "stock_quotes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String(20), unique=True, index=True)   # e.g., 002714
+    name = Column(String(50))                              # e.g., 牧原股份
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    last_price = Column(Float)
+    yesterday_close = Column(Float)
+    volume = Column(Float)
+    amount = Column(Float)
+    date = Column(Date, index=True)
+    time = Column(String(10))                              # e.g., 15:00:00
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class FrozenPorkStorage(Base):
+    __tablename__ = "frozen_pork_storage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    reserve_volume = Column(Float, nullable=True)          # 储备冻猪肉投放/收储量 (万吨)
+    commercial_inventory = Column(Float, nullable=True)    # 商业冻品库存估算量 (万吨)
+    storage_rate = Column(Float, nullable=True)            # 冻品库容率 (%)
+
