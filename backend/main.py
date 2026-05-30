@@ -9,6 +9,7 @@ from .models import (
     FuturesQuote, FuturesKline, SpotPrice, ProvincialPrice,
     BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice
 )
+from . import schemas
 from .scraper import (
     fetch_live_futures, LH_CONTRACTS, fetch_spot_prices,
     fetch_provincial_prices, fetch_breeding_indicators,
@@ -16,6 +17,7 @@ from .scraper import (
     fetch_pork_prices
 )
 from .scheduler import start_scheduler, stop_scheduler
+from .yijing import generate_yijing_forecast
 
 app = FastAPI(title="生猪期货基本面数据监控与决策系统 API", version="1.0.0")
 
@@ -96,7 +98,7 @@ def trigger_data_sync(db: Session = Depends(get_db)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/futures/realtime")
+@app.get("/api/futures/realtime", response_model=List[schemas.FuturesQuoteOut])
 def get_realtime_futures(db: Session = Depends(get_db)):
     """Get real-time quotes of all active contracts"""
     quotes = db.query(FuturesQuote).order_by(FuturesQuote.symbol).all()
@@ -106,7 +108,7 @@ def get_realtime_futures(db: Session = Depends(get_db)):
         quotes = db.query(FuturesQuote).order_by(FuturesQuote.symbol).all()
     return quotes
 
-@app.get("/api/futures/kline/{symbol}")
+@app.get("/api/futures/kline/{symbol}", response_model=List[schemas.FuturesKlineOut])
 def get_futures_kline(symbol: str, db: Session = Depends(get_db)):
     """Get historical daily K-line for a specific contract or LH0"""
     klines = db.query(FuturesKline).filter(
@@ -117,19 +119,19 @@ def get_futures_kline(symbol: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"No K-line data found for contract {symbol}")
     return klines
 
-@app.get("/api/spot/basis")
+@app.get("/api/spot/basis", response_model=List[schemas.SpotPriceOut])
 def get_spot_and_basis(db: Session = Depends(get_db)):
     """Get historical spot prices and computed basis values"""
     spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
     return spots
 
-@app.get("/api/spot/pork")
+@app.get("/api/spot/pork", response_model=List[schemas.PorkPriceOut])
 def get_pork_prices(db: Session = Depends(get_db)):
     """Get historical wholesale pork prices"""
     prices = db.query(PorkPrice).order_by(PorkPrice.date.asc()).all()
     return prices
 
-@app.get("/api/spot/provincial")
+@app.get("/api/spot/provincial", response_model=List[schemas.ProvincialPriceOut])
 def get_provincial_prices(db: Session = Depends(get_db)):
     """Get current provincial hog price rankings"""
     # Get the latest date we have provincial data for
@@ -142,13 +144,13 @@ def get_provincial_prices(db: Session = Depends(get_db)):
     ).order_by(ProvincialPrice.price.desc()).all()
     return prices
 
-@app.get("/api/fundamentals/capacity")
+@app.get("/api/fundamentals/capacity", response_model=List[schemas.SwineCapacityOut])
 def get_swine_capacity(db: Session = Depends(get_db)):
     """Get monthly swine inventory and production capacity indicators"""
     capacity = db.query(SwineCapacity).order_by(SwineCapacity.date.asc()).all()
     return capacity
 
-@app.get("/api/fundamentals/costs")
+@app.get("/api/fundamentals/costs", response_model=List[schemas.BreedingIndicatorOut])
 def get_breeding_costs_and_profits(db: Session = Depends(get_db)):
     """Get feed ingredient prices, pig-to-grain ratio, and profits"""
     indicators = db.query(BreedingIndicator).order_by(BreedingIndicator.date.asc()).all()
@@ -172,8 +174,8 @@ def get_epidemic_status(db: Session = Depends(get_db)):
         "sentiment": sentiment
     }
 
-@app.get("/api/expert/advice")
-def get_expert_advice(db: Session = Depends(get_db)):
+@app.get("/api/expert/advice", response_model=schemas.ExpertAdviceOut)
+def get_expert_advice(symbol: str = "LH0", db: Session = Depends(get_db)):
     """
     智能交叉校验与阶段性专家建议系统 API。
     通过整合当前的价格、体重、利润、产能、和舆情数据，生成市场判断结论与专业建议。
@@ -188,9 +190,13 @@ def get_expert_advice(db: Session = Depends(get_db)):
     spot_trend = "up" if latest_spot >= prev_spot else "down"
     spot_change_pct = round(((latest_spot - prev_spot) / prev_spot) * 100, 2) if prev_spot > 0 else 0.0
     
-    # 2. Fetch latest futures price (continuous index LH0)
-    lh0_quote = db.query(FuturesQuote).filter(FuturesQuote.symbol == "LH0").first()
-    futures_price = lh0_quote.last_price if lh0_quote else 12080.0
+    # 2. Fetch latest futures price (use provided symbol)
+    target_quote = db.query(FuturesQuote).filter(FuturesQuote.symbol == symbol.upper()).first()
+    if not target_quote:
+        # Fallback to LH0 if requested symbol not found
+        target_quote = db.query(FuturesQuote).filter(FuturesQuote.symbol == "LH0").first()
+        
+    futures_price = target_quote.last_price if target_quote else 12080.0
     basis = round(latest_spot * 1000.0 - futures_price, 2)
     
     # 3. Fetch latest breeding indicators
@@ -298,3 +304,40 @@ def get_expert_advice(db: Session = Depends(get_db)):
         },
         "advice": advice
     }
+
+@app.get("/api/yijing/forecast")
+def get_yijing_forecast(symbol: str = "LH0", db: Session = Depends(get_db)):
+    """
+    六爻 × 梅花易数 交叉决策系统。
+    基于当前时刻、实时价格与量化基本面数据，推演卦象并生成实时及1/5/10日期货价格预测走势图。
+    """
+    # 获取最新现货价格
+    latest_spot = db.query(SpotPrice).order_by(SpotPrice.date.desc()).first()
+    spot_price = latest_spot.price if latest_spot else 15.4
+
+    # 获取指定合约或主力合约价格
+    target_quote = db.query(FuturesQuote).filter(FuturesQuote.symbol == symbol.upper()).first()
+    if not target_quote:
+        target_quote = db.query(FuturesQuote).filter(FuturesQuote.symbol == "LH0").first()
+        
+    futures_price = target_quote.last_price if target_quote else 13500.0
+
+    # 获取基本面指标
+    latest_indicator = db.query(BreedingIndicator).order_by(BreedingIndicator.date.desc()).first()
+    pig_to_grain = latest_indicator.pig_to_grain_ratio if latest_indicator else 5.8
+    self_profit = latest_indicator.self_breeding_profit if latest_indicator else -100.0
+    corn_price = latest_indicator.corn_price if latest_indicator else 2420.0
+
+    try:
+        result = generate_yijing_forecast(
+            spot_price=spot_price,
+            futures_price=futures_price,
+            pig_to_grain=pig_to_grain,
+            self_profit=self_profit,
+            corn_price=corn_price,
+        )
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"卦象推演失败: {str(e)}")
