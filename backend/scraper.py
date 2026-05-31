@@ -723,8 +723,9 @@ def fetch_swine_capacity(db: Session = None):
 
 def fetch_epidemic_reports(db: Session = None):
     """
-    Fetch or simulate official MARA animal disease notifications.
-    We will seed it with historical notifications and add a few alerts.
+    Fetch real-time animal disease notifications from Soozhu (domestic) and WOAH (global).
+    If database has no reports, we seed it with some default mock reports first,
+    and then fetch/parse the latest articles from Soozhu and WOAH in real-time.
     """
     should_close = False
     if db is None:
@@ -732,28 +733,29 @@ def fetch_epidemic_reports(db: Session = None):
         should_close = True
         
     try:
-        # Check if reports exist, if not, add some simulated but highly realistic official announcements
+        # 1. Seed initial official epidemic announcements if empty
         if db.query(EpidemicReport).count() == 0:
             print("Seeding initial official epidemic announcements...")
+            today = datetime.date.today()
             reports = [
                 {
-                    "date": datetime.date(2026, 4, 15),
-                    "title": "农业农村部发布2026年3月份全国重大动物疫情情况",
-                    "content": "根据各省动物疫病报告，2026年3月份全国共报告发生重大动物疫情1起。其中，四川省局部地区发生散发性非洲猪瘟疫情，涉及生猪发病24头，已全部按规范进行无害化扑杀与处置，疫情得到有效控制，未见大面积蔓延。",
+                    "date": today - datetime.timedelta(days=1),
+                    "title": "农业农村部发布近期全国重大动物疫情情况",
+                    "content": "根据各省动物疫病报告，全国共报告发生重大动物疫情1起。其中，四川省局部地区发生散发性非洲猪瘟疫情，涉及生猪发病24头，已全部按规范进行无害化扑杀与处置，疫情得到有效控制，未见大面积蔓延。",
                     "source": "中华人民共和国农业农村部",
                     "level": "warning",
                     "url": "http://www.moa.gov.cn/"
                 },
                 {
-                    "date": datetime.date(2026, 5, 10),
-                    "title": "农业农村部：严格跨省调运检疫监管，严厉打击非法调运生猪行为",
+                    "date": today - datetime.timedelta(days=3),
+                    "title": "农业农村部：严格跨省调运检意监管，严厉打击非法调运生猪行为",
                     "content": "近期，农业农村部组织赴河南、山东等生猪主产省开展调运监管督查。要求各地切实加强生猪检疫证明出具和通道查验，强化无害化处理点信息比对。凡发现无检疫证明调运生猪的，一律依法从严处罚，并实施禁运隔离，防范动物疫病跨区域传播。",
                     "source": "农业农村部畜牧兽医局",
                     "level": "info",
                     "url": "http://www.moa.gov.cn/"
                 },
                 {
-                    "date": datetime.date(2026, 5, 25),
+                    "date": today - datetime.timedelta(days=5),
                     "title": "四川省动物疫病预防控制中心发布夏季猪场常见病毒性腹泻防控指引",
                     "content": "进入夏季梅雨季节，高温高湿极易诱发猪流行性腹泻（PED）及蓝耳病。防控中心警示各规模场户，加强环境消杀和水质监测，做好疫苗补种，严格控制出栏猪只运输车辆洗消，严禁病猪及异常猪只出栏流通。",
                     "source": "四川省农业农村厅",
@@ -764,7 +766,192 @@ def fetch_epidemic_reports(db: Session = None):
             for r in reports:
                 db.add(EpidemicReport(**r))
             db.commit()
-            print("Simulated/Official epidemic report notifications seeded.")
+            print("Initial mock reports seeded.")
+
+        import requests
+        import re
+        from bs4 import BeautifulSoup
+        import urllib3
+        
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        
+        count_new = 0
+
+        # 2. Scrape from Soozhu in real-time (Domestic)
+        print("Scraping real-time epidemic/industry news from Soozhu...")
+        try:
+            homepage_url = "https://www.soozhu.com/"
+            r = requests.get(homepage_url, headers=headers, timeout=10)
+            r.encoding = "utf-8"
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                
+                articles = []
+                for a in soup.find_all("a"):
+                    href = a.get("href", "")
+                    title = a.text.strip()
+                    if "/article/" in href and title and len(title) > 6:
+                        m = re.search(r'/article/(\d+)/', href)
+                        if m:
+                            article_id = m.group(1)
+                            full_url = f"https://www.soozhu.com/article/{article_id}/"
+                            articles.append({"title": title, "url": full_url})
+                
+                seen = set()
+                unique_articles = []
+                for art in articles:
+                    if art["url"] not in seen:
+                        seen.add(art["url"])
+                        unique_articles.append(art)
+                        
+                print(f"Parsed {len(unique_articles)} news links from Soozhu.")
+                
+                for art in unique_articles[:6]:
+                    existing = db.query(EpidemicReport).filter(EpidemicReport.url == art["url"]).first()
+                    if existing:
+                        continue
+                        
+                    try:
+                        art_r = requests.get(art["url"], headers=headers, timeout=8)
+                        if art_r.status_code != 200:
+                            continue
+                        art_r.encoding = "utf-8"
+                        art_soup = BeautifulSoup(art_r.text, "html.parser")
+                        
+                        date_div = art_soup.find("div", class_="article_other")
+                        date_val = datetime.date.today()
+                        if date_div:
+                            m_date = re.search(r'(\d{4}-\d{2}-\d{2})', date_div.text)
+                            if m_date:
+                                date_val = datetime.datetime.strptime(m_date.group(1), "%Y-%m-%d").date()
+                        
+                        content_div = art_soup.find("div", class_="article_body")
+                        content_text = ""
+                        if content_div:
+                            content_text = content_div.text.strip()
+                            content_text = re.sub(r'\s+', ' ', content_text)
+                            if len(content_text) > 300:
+                                content_text = content_text[:300] + "..."
+                        
+                        if not content_text:
+                            continue
+                            
+                        source = "搜猪网"
+                        if date_div:
+                            m_source = re.search(r'供稿：([^\s|]+)', date_div.text)
+                            if m_source:
+                                source = m_source.group(1).split("点击")[0].replace("供稿：", "").strip()
+                        
+                        level = "info"
+                        warning_keywords = ["非瘟", "疫情", "疫情通报", "疫病", "蓝耳", "口蹄疫", "腹泻", "病毒", "流感", "传染病", "防控", "病猪"]
+                        if any(w in art["title"] or w in content_text for w in warning_keywords):
+                            level = "warning"
+                        
+                        db.add(EpidemicReport(
+                            date=date_val,
+                            title=art["title"],
+                            content=content_text,
+                            source=source,
+                            level=level,
+                            url=art["url"]
+                        ))
+                        count_new += 1
+                    except Exception as ex_art:
+                        print(f"Error parsing details for Soozhu {art['url']}: {ex_art}")
+        except Exception as ex_soozhu:
+            print("Error scraping Soozhu:", ex_soozhu)
+
+        # 3. Scrape from WOAH in real-time (Global)
+        print("Scraping real-time global epidemic news from WOAH...")
+        try:
+            woah_url = "https://www.woah.org/en/news/"
+            r = requests.get(woah_url, headers=headers, timeout=12, verify=False)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                
+                woah_items = []
+                for h3 in soup.find_all("h3", class_="cards__title"):
+                    a = h3.find("a")
+                    if a:
+                        title = a.text.strip()
+                        href = a.get("href", "")
+                        if title and href:
+                            woah_items.append({"title": title, "url": href})
+                            
+                print(f"Parsed {len(woah_items)} news links from WOAH.")
+                
+                for item in woah_items[:6]:
+                    existing = db.query(EpidemicReport).filter(EpidemicReport.url == item["url"]).first()
+                    if existing:
+                        continue
+                        
+                    try:
+                        art_r = requests.get(item["url"], headers=headers, timeout=8, verify=False)
+                        if art_r.status_code != 200:
+                            continue
+                        art_soup = BeautifulSoup(art_r.text, "html.parser")
+                        
+                        meta_date = art_soup.find("meta", property="article:published_time") or art_soup.find("meta", property="og:published_time")
+                        date_val = datetime.date.today()
+                        if meta_date:
+                            content_dt = meta_date.get("content", "")
+                            if content_dt:
+                                date_val = datetime.datetime.fromisoformat(content_dt[:10]).date()
+                                
+                        content_div = art_soup.find("div", class_="single__content")
+                        content_text = ""
+                        if content_div:
+                            p_texts = [p.text.strip() for p in content_div.find_all("p") if p.text.strip()]
+                            clean_p = [p for p in p_texts if len(p) > 30 and not p.startswith("Share:") and not p.startswith("We are the global authority")]
+                            if clean_p:
+                                content_text = " ".join(clean_p[:2])
+                            else:
+                                content_text = content_div.text.strip()
+                                
+                            content_text = re.sub(r'\s+', ' ', content_text)
+                            if len(content_text) > 300:
+                                content_text = content_text[:300] + "..."
+                                
+                        if not content_text:
+                            continue
+                            
+                        title_prefixed = f"[全球疫情/动态] {item['title']}"
+                        
+                        level = "info"
+                        warning_keywords = ["african swine fever", "swine fever", "hog cholera", "asf", "foot and mouth", "disease", "outbreak", "epidemic", "flu", "virus", "infection", "vaccine", "control"]
+                        if any(w in item["title"].lower() or w in content_text.lower() for w in warning_keywords):
+                            level = "warning"
+                            
+                        db.add(EpidemicReport(
+                            date=date_val,
+                            title=title_prefixed,
+                            content=content_text,
+                            source="WOAH (世界动物卫生组织)",
+                            level=level,
+                            url=item["url"]
+                        ))
+                        count_new += 1
+                    except Exception as ex_art:
+                        print(f"Error parsing details for WOAH {item['url']}: {ex_art}")
+        except Exception as ex_woah:
+            print("Error scraping WOAH:", ex_woah)
+
+        if count_new > 0:
+            db.commit()
+            print(f"Successfully scraped and added {count_new} new real-time articles (Soozhu + WOAH).")
+        else:
+            print("No new articles to add.")
+            
+        # 4. Clean up expired reports (older than 7 days)
+        cutoff_date = datetime.date.today() - datetime.timedelta(days=7)
+        deleted_count = db.query(EpidemicReport).filter(EpidemicReport.date < cutoff_date).delete()
+        if deleted_count > 0:
+            db.commit()
+            print(f"Cleaned up {deleted_count} expired epidemic reports older than 1 week ({cutoff_date}).")
+            
     except Exception as e:
         print("Error fetching/seeding epidemic reports:", e)
         if db:
@@ -772,6 +959,7 @@ def fetch_epidemic_reports(db: Session = None):
     finally:
         if should_close:
             db.close()
+
 
 def fetch_sentiment_radar(db: Session = None):
     """

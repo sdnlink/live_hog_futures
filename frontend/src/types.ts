@@ -64,6 +64,7 @@ export interface SwineCapacity {
   pork_consumption: number | null;
   slaughterhouse_volume: number | null;
   slaughterhouse_operating_rate: number | null;
+  average_market_weight?: number | null;
 }
 
 export interface BreedingIndicator {

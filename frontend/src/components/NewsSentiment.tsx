@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
 import type { EpidemicReport, SentimentIndex } from '../types';
+import AutoScrollFeed from './AutoScrollFeed';
 
 interface NewsSentimentProps {
   epidemicReports: EpidemicReport[];
@@ -17,17 +18,24 @@ const NewsSentiment: React.FC<NewsSentimentProps> = ({ epidemicReports, sentimen
         </div>
       </div>
 
-      <div className="epidemic-feed" style={{ maxHeight: '140px', overflowY: 'auto' }}>
-        {epidemicReports.slice(0, 3).map((report, idx) => (
-          <div key={idx} className="epidemic-item" style={{ padding: '6px' }}>
+      <AutoScrollFeed className="epidemic-feed" style={{ maxHeight: '140px' }}>
+        {epidemicReports.slice(0, 12).map((report, idx) => (
+          <a 
+            key={idx} 
+            className="epidemic-item" 
+            href={report.url || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ padding: '6px', textDecoration: 'none', display: 'block', cursor: report.url ? 'pointer' : 'default' }}
+          >
             <div className="epidemic-item-header">
               <span className="epidemic-title" style={{ fontSize: '0.72rem', width: '180px' }}>{report.title}</span>
               <span className="epidemic-date mono" style={{ fontSize: '0.6rem' }}>{report.date.slice(5)}</span>
             </div>
             <p className="epidemic-body" style={{ fontSize: '0.68rem', WebkitLineClamp: 1 }}>{report.content}</p>
-          </div>
+          </a>
         ))}
-      </div>
+      </AutoScrollFeed>
 
       <div className="sentiment-grid" style={{ marginTop: '8px', gap: '4px' }}>
         {sentimentIndex.slice(0, 4).map((item, idx) => {

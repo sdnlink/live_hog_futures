@@ -244,7 +244,8 @@ function App() {
               </div>
 
               <div className="chart-viewport" style={
-                activeChartTab === 'capacity' || activeChartTab === 'frozen-pork' ? { height: '820px' } : 
+                activeChartTab === 'capacity' ? { height: '1200px' } :
+                activeChartTab === 'frozen-pork' ? { height: '820px' } : 
                 activeChartTab === 'yijing' ? { height: 'auto', minHeight: '1000px' } : 
                 activeChartTab === 'calculator' ? { height: 'auto', minHeight: '480px' } : 
                 undefined

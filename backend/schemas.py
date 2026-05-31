@@ -80,6 +80,7 @@ class SwineCapacityOut(BaseModel):
     pork_consumption: Optional[float] = None
     slaughterhouse_volume: Optional[float] = None
     slaughterhouse_operating_rate: Optional[float] = None
+    average_market_weight: Optional[float] = None
 
     class Config:
         from_attributes = True

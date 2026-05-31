@@ -3,6 +3,7 @@ import { Map, FileText, TrendingUp as StockIcon } from 'lucide-react';
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, LineChart, Line, Legend } from 'recharts';
 import type { ProvincialPrice, EpidemicReport, SentimentIndex, StockKline, StockQuote } from '../types';
 import StockTable from './StockTable';
+import AutoScrollFeed from './AutoScrollFeed';
 
 interface BottomDashboardProps {
   provPrices: ProvincialPrice[];
@@ -198,9 +199,16 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Disease alerts</span>
             </div>
 
-            <div className="epidemic-feed" style={{ maxHeight: '220px' }}>
+            <AutoScrollFeed className="epidemic-feed" style={{ maxHeight: '220px' }}>
               {epidemicReports.map((report, idx) => (
-                <div key={idx} className="epidemic-item">
+                <a 
+                  key={idx} 
+                  className="epidemic-item"
+                  href={report.url || undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ textDecoration: 'none', display: 'block', cursor: report.url ? 'pointer' : 'default' }}
+                >
                   <div className="epidemic-item-header">
                     <span className="epidemic-title">{report.title}</span>
                     <span className="epidemic-date mono">{report.date}</span>
@@ -208,13 +216,16 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
                   <p className="epidemic-body">{report.content}</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                     <span>来源: {report.source}</span>
-                    <span style={{ color: report.level === 'warning' ? 'var(--color-warn)' : 'var(--color-accent)' }}>
-                      级别: {report.level.toUpperCase()}
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {report.url && <span style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>点击访问</span>}
+                      <span style={{ color: report.level === 'warning' ? 'var(--color-warn)' : report.level === 'danger' ? 'var(--color-down)' : 'var(--color-accent)' }}>
+                        级别: {report.level.toUpperCase()}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </a>
               ))}
-            </div>
+            </AutoScrollFeed>
 
             <div className="sentiment-grid">
               {sentimentIndex.map((item, idx) => {
@@ -288,9 +299,16 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Disease alerts</span>
         </div>
 
-        <div className="epidemic-feed">
+        <AutoScrollFeed className="epidemic-feed" style={{ maxHeight: '240px' }}>
           {epidemicReports.map((report, idx) => (
-            <div key={idx} className="epidemic-item">
+            <a 
+              key={idx} 
+              className="epidemic-item"
+              href={report.url || undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none', display: 'block', cursor: report.url ? 'pointer' : 'default' }}
+            >
               <div className="epidemic-item-header">
                 <span className="epidemic-title">{report.title}</span>
                 <span className="epidemic-date mono">{report.date}</span>
@@ -298,13 +316,16 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
               <p className="epidemic-body">{report.content}</p>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 <span>来源: {report.source}</span>
-                <span style={{ color: report.level === 'warning' ? 'var(--color-warn)' : 'var(--color-accent)' }}>
-                  级别: {report.level.toUpperCase()}
-                </span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {report.url && <span style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>点击访问</span>}
+                  <span style={{ color: report.level === 'warning' ? 'var(--color-warn)' : report.level === 'danger' ? 'var(--color-down)' : 'var(--color-accent)' }}>
+                    级别: {report.level.toUpperCase()}
+                  </span>
+                </div>
               </div>
-            </div>
+            </a>
           ))}
-        </div>
+        </AutoScrollFeed>
 
         <div className="sentiment-grid">
           {sentimentIndex.map((item, idx) => {

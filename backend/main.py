@@ -163,6 +163,7 @@ def interpolate_swine_capacity(records: List[SwineCapacity], granularity: str = 
                 "pork_consumption": r.pork_consumption,
                 "slaughterhouse_volume": r.slaughterhouse_volume,
                 "slaughterhouse_operating_rate": r.slaughterhouse_operating_rate,
+                "average_market_weight": round((r.pork_production * 1000.0 / r.hog_slaughter) / 0.75, 2) if r.pork_production and r.hog_slaughter and r.hog_slaughter > 0 else None
             }
             for r in records
         ]
@@ -217,16 +218,23 @@ def interpolate_swine_capacity(records: List[SwineCapacity], granularity: str = 
                 return round(val, 2)
             return None
 
+        p_prod = interp(rec_before.pork_production, rec_after.pork_production, True)
+        h_slaughter = interp(rec_before.hog_slaughter, rec_after.hog_slaughter, True)
+        avg_w = None
+        if p_prod and h_slaughter and h_slaughter > 0:
+            avg_w = round((p_prod * 1000.0 / h_slaughter) / 0.75, 2)
+
         rec = {
             "id": idx,
             "date": current_date,
             "maternal_sow_inventory": interp(rec_before.maternal_sow_inventory, rec_after.maternal_sow_inventory, False),
-            "pork_production": interp(rec_before.pork_production, rec_after.pork_production, True),
-            "hog_slaughter": interp(rec_before.hog_slaughter, rec_after.hog_slaughter, True),
+            "pork_production": p_prod,
+            "hog_slaughter": h_slaughter,
             "hog_inventory": interp(rec_before.hog_inventory, rec_after.hog_inventory, False),
             "pork_consumption": interp(rec_before.pork_consumption, rec_after.pork_consumption, True),
             "slaughterhouse_volume": interp(rec_before.slaughterhouse_volume, rec_after.slaughterhouse_volume, True),
             "slaughterhouse_operating_rate": interp(rec_before.slaughterhouse_operating_rate, rec_after.slaughterhouse_operating_rate, False),
+            "average_market_weight": avg_w
         }
         interp_records.append(rec)
         idx += 1
@@ -240,7 +248,26 @@ def get_swine_capacity(granularity: str = "monthly", db: Session = Depends(get_d
     capacity = db.query(SwineCapacity).order_by(SwineCapacity.date.asc()).all()
     if granularity in ("weekly", "daily"):
         return interpolate_swine_capacity(capacity, granularity)
-    return capacity
+        
+    # Format monthly records as well to populate average_market_weight
+    result = []
+    for r in capacity:
+        avg_weight = None
+        if r.pork_production and r.hog_slaughter and r.hog_slaughter > 0:
+            avg_weight = round((r.pork_production * 1000.0 / r.hog_slaughter) / 0.75, 2)
+        result.append({
+            "id": r.id,
+            "date": r.date,
+            "maternal_sow_inventory": r.maternal_sow_inventory,
+            "pork_production": r.pork_production,
+            "hog_slaughter": r.hog_slaughter,
+            "hog_inventory": r.hog_inventory,
+            "pork_consumption": r.pork_consumption,
+            "slaughterhouse_volume": r.slaughterhouse_volume,
+            "slaughterhouse_operating_rate": r.slaughterhouse_operating_rate,
+            "average_market_weight": avg_weight
+        })
+    return result
 
 
 
@@ -321,11 +348,13 @@ def get_expert_advice(symbol: str = "LH0", db: Session = Depends(get_db)):
     self_profit = latest_indicator.self_breeding_profit if latest_indicator else -100.0
     purch_profit = latest_indicator.piglet_breeding_profit if latest_indicator else -200.0
     
-    # 4. Fetch latest average weight (from K-line index or simulated averages)
-    # Average slaughter weight is roughly between 115-130kg. Let's simulate a current trend
-    # Weight changes: > 125kg indicates hold-back/fattening; < 118kg indicates panic selling.
-    avg_weight = 124.5  # default/current
-    weight_trend = "up" # holding back
+    # 4. Fetch latest average weight from SwineCapacity
+    latest_capacity = db.query(SwineCapacity).order_by(SwineCapacity.date.desc()).first()
+    avg_weight = 124.5  # default/fallback
+    if latest_capacity and latest_capacity.pork_production and latest_capacity.hog_slaughter and latest_capacity.hog_slaughter > 0:
+        avg_weight = round((latest_capacity.pork_production * 1000.0 / latest_capacity.hog_slaughter) / 0.75, 1)
+        
+    weight_trend = "up" if avg_weight >= 123.0 else "down"
     
     # 5. Fetch epidemic warnings
     sentiment_records = db.query(SentimentIndex).order_by(SentimentIndex.date.desc()).limit(10).all()

@@ -232,6 +232,27 @@ const MainCharts: React.FC<MainChartsProps> = ({
             </ResponsiveContainer>
           </div>
         </div>
+
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            估算生猪出栏均重趋势 {granularityText}
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={activeData.filter(d => d.average_market_weight !== null && d.average_market_weight !== undefined)}
+                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis stroke="var(--text-muted)" domain={['dataMin - 5', 'dataMax + 5']} fontSize={10} label={{ value: '估算出栏均重 (公斤/头)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Line name="出栏均重 (公斤/头)" type="monotone" dataKey="average_market_weight" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
     );
   }
