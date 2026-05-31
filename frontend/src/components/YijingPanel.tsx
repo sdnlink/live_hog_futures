@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, RefreshCw } from 'lucide-react';
+import { Sparkles, RefreshCw, ShieldAlert } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, Radar,
@@ -55,6 +55,20 @@ const MiniGuaSymbol: React.FC<{ upperIdx: number; lowerIdx: number }> = ({ upper
 };
 
 const YijingPanel: React.FC<YijingPanelProps> = ({ yijingForecast, isYijingLoading, fetchYijingForecast }) => {
+  // 检查卦象是否是今日生成的
+  const isForecastToday = React.useMemo(() => {
+    if (!yijingForecast || !yijingForecast.timestamp) return false;
+    const forecastDateStr = yijingForecast.timestamp.split(' ')[0];
+    
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+    
+    return forecastDateStr === todayStr;
+  }, [yijingForecast]);
+
   // 五行能量对比计算
   const getWuxingData = () => {
     if (!yijingForecast) return [];
@@ -334,14 +348,21 @@ const YijingPanel: React.FC<YijingPanelProps> = ({ yijingForecast, isYijingLoadi
                     </div>
                   </div>
                   <p className="yijing-interp-text conclusion-inline">{yijingForecast.interpretation?.conclusion}</p>
-                  <button
-                    className="yijing-refresh-btn-small"
-                    onClick={fetchYijingForecast}
-                    disabled={isYijingLoading}
-                  >
-                    <RefreshCw size={12} className={isYijingLoading ? 'animate-spin' : ''} />
-                    重新起卦
-                  </button>
+                  {isForecastToday ? (
+                    <div className="yijing-locked-badge" title="易卦决策每日仅支持测算一次">
+                      <ShieldAlert size={12} />
+                      <span>今日已起卦</span>
+                    </div>
+                  ) : (
+                    <button
+                      className="yijing-refresh-btn-small"
+                      onClick={fetchYijingForecast}
+                      disabled={isYijingLoading}
+                    >
+                      <RefreshCw size={12} className={isYijingLoading ? 'animate-spin' : ''} />
+                      重新起卦
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

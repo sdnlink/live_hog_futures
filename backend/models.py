@@ -209,3 +209,17 @@ class HogLogisticsAndSafety(Base):
     mortality_waste_disposal = Column(Float, nullable=True)    # 病死猪无害化处理量 (吨)
 
 
+class YijingForecastRecord(Base):
+    """易卦决策每日测算缓存表"""
+    __tablename__ = "yijing_forecast_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, index=True)
+    symbol = Column(String(20), index=True)
+    forecast_data = Column(Text)
+
+    __table_args__ = (
+        Index('idx_yijing_symbol_date', 'symbol', 'date', unique=True),
+    )
+
+

@@ -983,6 +983,25 @@
   border-color: rgba(74, 222, 128, 0.4);
 }
 
+.yijing-locked-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  color: #fbbf24;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 16px;
+  width: fit-content;
+  margin-left: auto;
+  user-select: none;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.05);
+}
+
 /* ================================================================
    Yijing Trigrams & Hexagrams Graphics Styling
    ================================================================ */

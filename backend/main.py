@@ -10,7 +10,7 @@ from .models import (
     BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice,
     StockKline, StockQuote, FrozenPorkStorage,
     BiopharmaceuticalProcurement, BreedingConsumableConsumption,
-    FeedSalesBreakdown, HogLogisticsAndSafety
+    FeedSalesBreakdown, HogLogisticsAndSafety, YijingForecastRecord
 )
 from .scraper import (
     fetch_live_futures, LH_CONTRACTS, fetch_spot_prices,
@@ -544,6 +544,21 @@ def get_yijing_forecast(symbol: str = "LH0", db: Session = Depends(get_db)):
     六爻 × 梅花易数 交叉决策系统。
     基于当前时刻、实时价格与量化基本面数据，推演卦象并生成实时及1/5/10日期货价格预测走势图。
     """
+    import json
+    
+    # 1. 检查今日是否已存在该合约的卦象推演记录
+    today_date = datetime.date.today()
+    existing_record = db.query(YijingForecastRecord).filter(
+        YijingForecastRecord.date == today_date,
+        YijingForecastRecord.symbol == symbol.upper()
+    ).first()
+
+    if existing_record:
+        try:
+            return json.loads(existing_record.forecast_data)
+        except Exception:
+            pass  # 如果解析失败，则重新生成
+
     # 获取最新现货价格
     latest_spot = db.query(SpotPrice).order_by(SpotPrice.date.desc()).first()
     spot_price = latest_spot.price if latest_spot else 15.4
@@ -569,8 +584,19 @@ def get_yijing_forecast(symbol: str = "LH0", db: Session = Depends(get_db)):
             self_profit=self_profit,
             corn_price=corn_price,
         )
+        
+        # 2. 保存新生成的卦象数据到数据库
+        new_record = YijingForecastRecord(
+            date=today_date,
+            symbol=symbol.upper(),
+            forecast_data=json.dumps(result)
+        )
+        db.add(new_record)
+        db.commit()
+        
         return result
     except Exception as e:
+        db.rollback()
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"卦象推演失败: {str(e)}")
