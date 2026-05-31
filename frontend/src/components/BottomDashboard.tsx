@@ -32,7 +32,9 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
 
 const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicReports, sentimentIndex, stockData, stockQuotes, isFullPage = false }) => {
   const [stockTimeRange, setStockTimeRange] = useState<'30d' | '90d' | '180d' | '365d' | 'all'>('365d');
-  const sortedProvPrices = [...provPrices].sort((a, b) => b.price - a.price);
+  const sortedProvPrices = useMemo(() => {
+    return [...provPrices].sort((a, b) => b.price - a.price);
+  }, [provPrices]);
 
   // Calculate historical highest price and date for each company
   const historicalHighs = useMemo(() => {

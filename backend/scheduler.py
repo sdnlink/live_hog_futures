@@ -44,30 +44,32 @@ def is_stock_trading_hours():
 def realtime_scheduler_loop():
     """Task running every 10 seconds during trading hours to fetch live quotes"""
     global _running
-    db = SessionLocal()
     print("Real-time futures quote scheduler loop started.")
     
     while _running:
         try:
-            if is_trading_hours():
-                # print("Trading hours: updating real-time quotes...")
-                fetch_live_futures(db)
-            if is_stock_trading_hours():
-                # print("Stock trading hours: updating real-time stock quotes...")
-                fetch_live_stocks(db)
+            if is_trading_hours() or is_stock_trading_hours():
+                db = SessionLocal()
+                try:
+                    if is_trading_hours():
+                        # print("Trading hours: updating real-time quotes...")
+                        fetch_live_futures(db)
+                    if is_stock_trading_hours():
+                        # print("Stock trading hours: updating real-time stock quotes...")
+                        fetch_live_stocks(db)
+                finally:
+                    db.close()
             # Sleep 15 seconds
             time.sleep(15)
         except Exception as e:
             print("Error in real-time scheduler loop:", e)
             time.sleep(30)
             
-    db.close()
     print("Real-time futures quote scheduler loop stopped.")
 
 def daily_scheduler_loop():
     """Task running every hour, checking if it is time (e.g. 16:30) to pull daily statistics"""
     global _running
-    db = SessionLocal()
     print("Daily macro statistics scheduler loop started.")
     
     last_update_date = None
@@ -78,24 +80,27 @@ def daily_scheduler_loop():
             # Run update at 16:30 every day, or if it is a new day and we haven't updated yet
             if now.hour == 16 and now.date() != last_update_date:
                 print(f"Time is 16:30 on {now.date()}: Starting daily macro updates...")
-                
-                # Fetch daily indicators
-                fetch_spot_prices(db)
-                fetch_pork_prices(db)
-                fetch_provincial_prices(db)
-                fetch_breeding_indicators(db)
-                fetch_swine_capacity(db)
-                fetch_sentiment_radar(db)
-                
-                # Sync daily K-line closures
-                fetch_historical_kline("LH0", db)
-                for symbol in LH_CONTRACTS:
-                    fetch_historical_kline(symbol, db)
-                
-                # Sync stock and frozen pork storage
-                fetch_stock_klines(db)
-                fetch_live_stocks(db)
-                fetch_frozen_pork_storage(db)
+                db = SessionLocal()
+                try:
+                    # Fetch daily indicators
+                    fetch_spot_prices(db)
+                    fetch_pork_prices(db)
+                    fetch_provincial_prices(db)
+                    fetch_breeding_indicators(db)
+                    fetch_swine_capacity(db)
+                    fetch_sentiment_radar(db)
+                    
+                    # Sync daily K-line closures
+                    fetch_historical_kline("LH0", db)
+                    for symbol in LH_CONTRACTS:
+                        fetch_historical_kline(symbol, db)
+                    
+                    # Sync stock and frozen pork storage
+                    fetch_stock_klines(db)
+                    fetch_live_stocks(db)
+                    fetch_frozen_pork_storage(db)
+                finally:
+                    db.close()
                     
                 last_update_date = now.date()
                 print("Daily macro updates completed.")
@@ -106,7 +111,6 @@ def daily_scheduler_loop():
             print("Error in daily scheduler loop:", e)
             time.sleep(600)
             
-    db.close()
     print("Daily macro statistics scheduler loop stopped.")
 
 def random_sync_scheduler_loop():

@@ -63,7 +63,7 @@ const AutoScrollFeed: React.FC<AutoScrollFeedProps> = ({ children, className, st
       container.removeEventListener('mouseleave', handleMouseLeave);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [children]);
+  }, []);
 
   return (
     <div 

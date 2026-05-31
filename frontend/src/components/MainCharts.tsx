@@ -60,20 +60,86 @@ const MainCharts: React.FC<MainChartsProps> = ({
   filterByTimeRange
 }) => {
   const [granularity, setGranularity] = React.useState<'daily' | 'weekly' | 'monthly'>('daily');
+
+  // 1. Memoize spot-futures data combination
+  const spotFuturesData = React.useMemo(() => {
+    if (!spotBasisData || !spotBasisData.length) return [];
+    
+    // Create maps for quick O(1) lookup
+    const klineMap = new Map<string, number>();
+    klineData.forEach(kd => {
+      if (kd.date && kd.close) {
+        klineMap.set(kd.date, kd.close);
+      }
+    });
+
+    const porkMap = new Map<string, number>();
+    porkPriceData.forEach(pd => {
+      if (pd.date && pd.price) {
+        porkMap.set(pd.date, pd.price);
+      }
+    });
+
+    return spotBasisData.map(item => {
+      const futuresClose = klineMap.get(item.date);
+      const porkPrice = porkMap.get(item.date);
+      return {
+        date: item.date,
+        spotPrice: item.price,
+        futuresPrice: futuresClose ? futuresClose / 1000 : null,
+        porkPrice: porkPrice || null,
+      };
+    }).filter(d => d.futuresPrice !== null);
+  }, [spotBasisData, klineData, porkPriceData]);
+
+  const filteredSpotFuturesData = React.useMemo(() => {
+    return filterByTimeRange(spotFuturesData);
+  }, [spotFuturesData, filterByTimeRange]);
+
+  // 2. Memoize basis chart data
+  const basisData = React.useMemo(() => {
+    return spotBasisData.filter(d => d.basis !== null);
+  }, [spotBasisData]);
+
+  const filteredBasisData = React.useMemo(() => {
+    return filterByTimeRange(basisData);
+  }, [basisData, filterByTimeRange]);
+
+  // 3. Memoize costs & profit chart data
+  const filteredCostsData = React.useMemo(() => {
+    return filterByTimeRange(costsData);
+  }, [costsData, filterByTimeRange]);
+
+  // 4. Memoize capacity data
+  const filteredCapacityData = React.useMemo(() => {
+    let activeData = granularity === 'daily' ? dailyCapacityData : granularity === 'weekly' ? weeklyCapacityData : capacityData;
+    
+    // Filter by time range
+    activeData = filterByTimeRange(activeData);
+    
+    // Downsample if data is too dense (prevent rendering bottlenecks)
+    if (activeData.length > 300) {
+      const step = Math.ceil(activeData.length / 300);
+      activeData = activeData.filter((_, idx) => idx % step === 0);
+    }
+    
+    return activeData;
+  }, [granularity, dailyCapacityData, weeklyCapacityData, capacityData, filterByTimeRange]);
+
+  const weightData = React.useMemo(() => {
+    return filteredCapacityData.filter(d => d.average_market_weight !== null && d.average_market_weight !== undefined);
+  }, [filteredCapacityData]);
+
+  // 5. Memoize frozen pork data
+  const filteredFrozenPorkData = React.useMemo(() => {
+    return filterByTimeRange(frozenPorkData);
+  }, [frozenPorkData, filterByTimeRange]);
+
   if (activeChartTab === 'spot-futures') {
     return (
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
-          data={filterByTimeRange(spotBasisData.map(item => {
-            const k = klineData.find(kd => kd.date === item.date);
-            const p = porkPriceData.find(pd => pd.date === item.date);
-            return {
-              date: item.date,
-              spotPrice: item.price,
-              futuresPrice: k && k.close ? k.close / 1000 : null,
-              porkPrice: p ? p.price : null,
-            };
-          }).filter(d => d.futuresPrice !== null))}
+          data={filteredSpotFuturesData}
           margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -93,7 +159,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
     return (
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
-          data={filterByTimeRange(spotBasisData.filter(d => d.basis !== null))}
+          data={filteredBasisData}
           margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
         >
           <defs>
@@ -118,7 +184,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
     return (
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
-          data={filterByTimeRange(costsData)}
+          data={filteredCostsData}
           margin={{ top: 20, right: 30, bottom: 20, left: 10 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -137,17 +203,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
   }
 
   if (activeChartTab === 'capacity') {
-    let activeData = granularity === 'daily' ? dailyCapacityData : granularity === 'weekly' ? weeklyCapacityData : capacityData;
-    
-    // 1. Filter by time range first
-    activeData = filterByTimeRange(activeData);
-    
-    // 2. Dynamically downsample if data is too dense to prevent SVG rendering bottlenecks (6000+ points)
-    if (activeData.length > 300) {
-      const step = Math.ceil(activeData.length / 300);
-      activeData = activeData.filter((_, idx) => idx % step === 0);
-    }
-    
     const granularityText = granularity === 'daily' ? '(日度)' : granularity === 'weekly' ? '(周度)' : '(月度)';
     return (
       <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
@@ -190,7 +245,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <div style={{ flex: 1, minHeight: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={activeData}
+                data={filteredCapacityData}
                 margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -216,7 +271,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <div style={{ flex: 1, minHeight: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={activeData}
+                data={filteredCapacityData}
                 margin={{ top: 10, right: 50, bottom: 5, left: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -240,7 +295,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <div style={{ flex: 1, minHeight: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={activeData.filter(d => d.average_market_weight !== null && d.average_market_weight !== undefined)}
+                data={weightData}
                 margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -267,7 +322,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <div style={{ flex: 1, minHeight: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={filterByTimeRange(frozenPorkData)}
+                data={filteredFrozenPorkData}
                 margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -288,7 +343,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <div style={{ flex: 1, minHeight: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
-                data={filterByTimeRange(frozenPorkData)}
+                data={filteredFrozenPorkData}
                 margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
               >
                 <defs>
