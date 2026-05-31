@@ -171,3 +171,52 @@ class FrozenPorkStorageOut(BaseModel):
     class Config:
         from_attributes = True
 
+class BiopharmaceuticalProcurementOut(BaseModel):
+    id: int
+    date: date
+    swine_fever_vaccine: Optional[float] = None
+    prrs_vaccine: Optional[float] = None
+    fmd_vaccine: Optional[float] = None
+    diarrhea_vaccine: Optional[float] = None
+    altrenogest_sales: Optional[float] = None
+    oxytocin_sales: Optional[float] = None
+    vaccine_index: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+class BreedingConsumableConsumptionOut(BaseModel):
+    id: int
+    date: date
+    insemination_catheters: Optional[float] = None
+    semen_extender: Optional[float] = None
+    farrowing_dry_powder: Optional[float] = None
+    iron_injection: Optional[float] = None
+    ear_tags: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+class FeedSalesBreakdownOut(BaseModel):
+    id: int
+    date: date
+    sow_feed: Optional[float] = None
+    piglet_feed: Optional[float] = None
+    grower_feed: Optional[float] = None
+    finisher_feed: Optional[float] = None
+    overall_feed_volume: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+class HogLogisticsAndSafetyOut(BaseModel):
+    id: int
+    date: date
+    quarantine_certificates: Optional[int] = None
+    transport_freight_index: Optional[float] = None
+    mortality_waste_disposal: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+

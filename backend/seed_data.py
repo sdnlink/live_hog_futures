@@ -10,7 +10,8 @@ from backend.scraper import (
     fetch_historical_kline, fetch_spot_prices, fetch_provincial_prices,
     fetch_breeding_indicators, fetch_swine_capacity, fetch_epidemic_reports,
     fetch_sentiment_radar, LH_CONTRACTS, fetch_pork_prices,
-    fetch_stock_klines, fetch_live_stocks, fetch_frozen_pork_storage
+    fetch_stock_klines, fetch_live_stocks, fetch_frozen_pork_storage,
+    fetch_biopharm_data, fetch_consumables_data, fetch_feed_breakdown, fetch_logistics_safety
 )
 
 def run_seeding():
@@ -65,6 +66,16 @@ def run_seeding():
     # 11. Frozen pork storage data
     print("\n11. Fetching frozen pork reserves and storage capacity...")
     fetch_frozen_pork_storage(db)
+    
+    # 12. Upstream supplies & alternative indicators
+    print("\n12. Seeding biopharmaceutical procurement data...")
+    fetch_biopharm_data(db)
+    print("\n13. Seeding breeding consumables data...")
+    fetch_consumables_data(db)
+    print("\n14. Seeding feed sales breakdown data...")
+    fetch_feed_breakdown(db)
+    print("\n15. Seeding logistics & health safety data...")
+    fetch_logistics_safety(db)
     
     print("\n=================== Seeding Completed Successfully! ===================")
     db.close()

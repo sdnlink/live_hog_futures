@@ -8,17 +8,20 @@ from .database import engine, Base, get_db
 from .models import (
     FuturesQuote, FuturesKline, SpotPrice, ProvincialPrice,
     BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice,
-    StockKline, StockQuote, FrozenPorkStorage
+    StockKline, StockQuote, FrozenPorkStorage,
+    BiopharmaceuticalProcurement, BreedingConsumableConsumption,
+    FeedSalesBreakdown, HogLogisticsAndSafety
 )
-from . import schemas
 from .scraper import (
     fetch_live_futures, LH_CONTRACTS, fetch_spot_prices,
     fetch_provincial_prices, fetch_breeding_indicators,
     fetch_swine_capacity, fetch_sentiment_radar, fetch_historical_kline,
-    fetch_pork_prices, fetch_live_stocks, fetch_stock_klines, fetch_frozen_pork_storage
+    fetch_pork_prices, fetch_live_stocks, fetch_stock_klines, fetch_frozen_pork_storage,
+    fetch_biopharm_data, fetch_consumables_data, fetch_feed_breakdown, fetch_logistics_safety
 )
 from .scheduler import start_scheduler, stop_scheduler
 from .yijing import generate_yijing_forecast
+from . import schemas
 
 app = FastAPI(title="生猪期货基本面数据监控与决策系统 API", version="1.0.0")
 
@@ -97,6 +100,12 @@ def trigger_data_sync(db: Session = Depends(get_db)):
         fetch_stock_klines(db)
         fetch_live_stocks(db)
         fetch_frozen_pork_storage(db)
+        
+        # 9. Upstream supplies & alternative indicators
+        fetch_biopharm_data(db)
+        fetch_consumables_data(db)
+        fetch_feed_breakdown(db)
+        fetch_logistics_safety(db)
             
         return {"status": "success", "message": "All data synchronized successfully!"}
     except Exception as e:
@@ -317,6 +326,31 @@ def get_frozen_pork_storage(db: Session = Depends(get_db)):
     storage = db.query(FrozenPorkStorage).order_by(FrozenPorkStorage.date.asc()).all()
     return storage
 
+@app.get("/api/fundamentals/biopharm", response_model=List[schemas.BiopharmaceuticalProcurementOut])
+def get_biopharm_procurement(db: Session = Depends(get_db)):
+    """获取历史生物动保医药采购数据"""
+    records = db.query(BiopharmaceuticalProcurement).order_by(BiopharmaceuticalProcurement.date.asc()).all()
+    return records
+
+@app.get("/api/fundamentals/consumables", response_model=List[schemas.BreedingConsumableConsumptionOut])
+def get_breeding_consumables(db: Session = Depends(get_db)):
+    """获取母猪配种及产房耗材消耗数据"""
+    records = db.query(BreedingConsumableConsumption).order_by(BreedingConsumableConsumption.date.asc()).all()
+    return records
+
+@app.get("/api/fundamentals/feed_breakdown", response_model=List[schemas.FeedSalesBreakdownOut])
+def get_feed_breakdown(db: Session = Depends(get_db)):
+    """获取饲料细分销量数据"""
+    records = db.query(FeedSalesBreakdown).order_by(FeedSalesBreakdown.date.asc()).all()
+    return records
+
+@app.get("/api/fundamentals/logistics_safety", response_model=List[schemas.HogLogisticsAndSafetyOut])
+def get_logistics_safety(db: Session = Depends(get_db)):
+    """获取物流调运、运能与病死处理数据"""
+    records = db.query(HogLogisticsAndSafety).order_by(HogLogisticsAndSafety.date.asc()).all()
+    return records
+
+
 @app.get("/api/expert/advice", response_model=schemas.ExpertAdviceOut)
 def get_expert_advice(symbol: str = "LH0", db: Session = Depends(get_db)):
     """
@@ -366,14 +400,67 @@ def get_expert_advice(symbol: str = "LH0", db: Session = Depends(get_db)):
         elif s.keyword in ["流行性腹泻", "腹泻"]:
             ped_score = max(ped_score, s.sentiment_score)
             
+    # 5b. Fetch latest alternative data indicators
+    latest_biopharm = db.query(BiopharmaceuticalProcurement).order_by(BiopharmaceuticalProcurement.date.desc()).first()
+    latest_consumables = db.query(BreedingConsumableConsumption).order_by(BreedingConsumableConsumption.date.desc()).first()
+    latest_feed = db.query(FeedSalesBreakdown).order_by(FeedSalesBreakdown.date.desc()).first()
+    latest_logistics = db.query(HogLogisticsAndSafety).order_by(HogLogisticsAndSafety.date.desc()).first()
+    
+    # Evaluate alternative data signals
+    from sqlalchemy import func
+    is_altren_depressed = False
+    if latest_biopharm and latest_biopharm.altrenogest_sales:
+        avg_altren = db.query(func.avg(BiopharmaceuticalProcurement.altrenogest_sales)).scalar() or 80.0
+        if latest_biopharm.altrenogest_sales < avg_altren * 0.85:
+            is_altren_depressed = True
+            
+    is_catheter_depressed = False
+    if latest_consumables and latest_consumables.insemination_catheters:
+        avg_catheter = db.query(func.avg(BreedingConsumableConsumption.insemination_catheters)).scalar() or 250.0
+        if latest_consumables.insemination_catheters < avg_catheter * 0.85:
+            is_catheter_depressed = True
+
+    is_finisher_ratio_high = False
+    if latest_feed and latest_feed.finisher_feed and latest_feed.overall_feed_volume:
+        finisher_ratio = latest_feed.finisher_feed / latest_feed.overall_feed_volume
+        if finisher_ratio > 0.52:
+            is_finisher_ratio_high = True
+
+    is_mortality_high = False
+    if latest_logistics and latest_logistics.mortality_waste_disposal:
+        avg_mortality = db.query(func.avg(HogLogisticsAndSafety.mortality_waste_disposal)).scalar() or 500.0
+        if latest_logistics.mortality_waste_disposal > avg_mortality * 1.3:
+            is_mortality_high = True
+
     # 6. Evaluation Logic & Verification Conclusions
     conclusion_title = "供需处于拉锯整理阶段"
     conclusion_desc = "当前生猪现货价格窄幅振荡，期现折合处于正常基差范围。市场补栏情绪一般，供需整体相持。"
     radar_scores = {"supply": 50, "demand": 50, "cost": 50, "policy": 50, "disease": 20}
     warning_level = "info"  # info, warning, danger
     
+    # Priority Rule 1: Epidemic disease verified by mortality disposal
+    if is_mortality_high and (asf_score > 25.0 or ped_score > 30.0):
+        conclusion_title = "疫情变动确认，产能加速出清"
+        conclusion_desc = "病死猪无害化处理量偏高均值30%以上，交叉验证了近期疫病多发舆情。虽然短期抛售冲击现货，但将锁定6个月后的生猪供给收紧，中远期期价具有强底部支撑。"
+        radar_scores = {"supply": 10, "demand": 55, "cost": 45, "policy": 60, "disease": 85}
+        warning_level = "danger"
+        
+    # Priority Rule 2: Finisher feed ratio warning (heavy hogs piling up)
+    elif spot_trend == "up" and is_finisher_ratio_high and avg_weight > 124.0:
+        conclusion_title = "大猪饲料占比过高，警惕压栏风险"
+        conclusion_desc = "大猪配合料销量占比突破52%，出栏体重偏重，显示压栏与二次育肥投机严重。终端肉类消费无明显增长，后期集中降体重出栏时，极易引发期现货供给性踩踏。"
+        radar_scores = {"supply": 30, "demand": 25, "cost": 70, "policy": 50, "disease": 10}
+        warning_level = "danger"
+        
+    # Priority Rule 3: Sow breeding intent collapse
+    elif is_altren_depressed and is_catheter_depressed and self_profit < 100.0:
+        conclusion_title = "繁育耗材收缩，补栏情绪冰冻"
+        conclusion_desc = "虽然现货价格尚稳，但上游烯丙孕素与配种输精管销量偏低均值15%以上，反映母猪实际补栏配种积极性低迷。这从上游锁定了8-10个月后的生猪供给收缩。"
+        radar_scores = {"supply": 25, "demand": 40, "cost": 80, "policy": 70, "disease": 15}
+        warning_level = "warning"
+        
     # Rule 1: Supply-Demand Divergence (虚火/虚假繁荣)
-    if spot_trend == "up" and avg_weight > 123.0 and pig_to_grain > 6.0:
+    elif spot_trend == "up" and avg_weight > 123.0 and pig_to_grain > 6.0:
         conclusion_title = "虚火上涨，需求疲软"
         conclusion_desc = "当前价格上涨主要由养殖端压栏惜售、二次育肥进场等投机供应收紧驱动，屠宰厂开工率与下游猪肉批发量未见实质配合。后期大猪出栏体重压降，将面临集中踩踏风险。"
         radar_scores = {"supply": 35, "demand": 30, "cost": 75, "policy": 50, "disease": 15}
@@ -399,6 +486,7 @@ def get_expert_advice(symbol: str = "LH0", db: Session = Depends(get_db)):
         conclusion_desc = "受饲料原材料玉米、豆粕价格高企影响，养殖保本线上升至 16.5 元/公斤以上。即使现货价持平，高成本仍对利润造成严重侵蚀，中小散户被迫淘汰母猪。"
         radar_scores = {"supply": 45, "demand": 40, "cost": 90, "policy": 55, "disease": 10}
         warning_level = "warning"
+
 
     # 7. Actionable Advice generation
     advice = {

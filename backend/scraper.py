@@ -14,7 +14,9 @@ socket.setdefaulttimeout(15)
 from .models import (
     FuturesQuote, FuturesKline, SpotPrice, ProvincialPrice,
     BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice,
-    StockKline, StockQuote, FrozenPorkStorage
+    StockKline, StockQuote, FrozenPorkStorage,
+    BiopharmaceuticalProcurement, BreedingConsumableConsumption,
+    FeedSalesBreakdown, HogLogisticsAndSafety
 )
 
 # Active contract list for live hog (LH)
@@ -1438,4 +1440,282 @@ def fetch_frozen_pork_storage(db: Session = None):
     finally:
         if should_close:
             db.close()
+
+def fetch_biopharm_data(db: Session = None):
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    try:
+        print("Simulating biopharmaceutical procurement data...")
+        import random
+        # We generate biopharmaceutical procurement matching SpotPrice dates
+        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
+        count = 0
+        for spot in spots:
+            dt = spot.date
+            # Base values dynamically correlated with spot price (profitability drives vaccination and hormone purchasing)
+            price = spot.price if spot.price > 0 else 15.0
+            
+            # Seed based on date to maintain consistency
+            random.seed(int(dt.strftime("%Y%m%d")) + 200)
+            
+            # Swine fever vaccine: base ~ 1200.0万支, PRRS: base ~ 600.0万支, FMD: ~ 800.0万支, Diarrhea: ~ 300.0万支 (higher in winter/spring)
+            # In winter/spring (Nov to Mar), diarrhea vaccine demand increases
+            month = dt.month
+            diarrhea_boost = 1.3 if month in [11, 12, 1, 2, 3] else 0.8
+            
+            # Higher prices -> more vaccine purchasing (better care/higher density)
+            price_factor = 0.8 + (price - 10.0) * 0.04
+            price_factor = max(0.5, min(1.5, price_factor))
+            
+            sf = round(1200.0 * price_factor * random.uniform(0.95, 1.05), 2)
+            prrs = round(600.0 * price_factor * random.uniform(0.94, 1.06), 2)
+            fmd = round(800.0 * price_factor * random.uniform(0.96, 1.04), 2)
+            diar = round(300.0 * price_factor * diarrhea_boost * random.uniform(0.92, 1.08), 2)
+            
+            # Altrenogest (烯丙孕素) sales: drives gilt heat synchronization. High profit -> high altrenogest
+            altren = round(80.0 * price_factor * random.uniform(0.9, 1.1), 2)
+            # Oxytocin (缩宫素): farrowing helper. Follows breeding levels
+            oxyt = round(150.0 * price_factor * random.uniform(0.92, 1.08), 2)
+            
+            # Vaccine index: overall health/vaccine purchase level
+            v_index = round(70.0 * price_factor + random.uniform(-3.0, 3.0), 2)
+            v_index = max(10.0, min(100.0, v_index))
+
+            existing = db.query(BiopharmaceuticalProcurement).filter(BiopharmaceuticalProcurement.date == dt).first()
+            biopharm_record = {
+                "date": dt,
+                "swine_fever_vaccine": sf,
+                "prrs_vaccine": prrs,
+                "fmd_vaccine": fmd,
+                "diarrhea_vaccine": diar,
+                "altrenogest_sales": altren,
+                "oxytocin_sales": oxyt,
+                "vaccine_index": v_index
+            }
+            if existing:
+                for k, v in biopharm_record.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(BiopharmaceuticalProcurement(**biopharm_record))
+            count += 1
+            if count % 200 == 0:
+                db.commit()
+        db.commit()
+        print(f"Synced {count} biopharmaceutical records.")
+    except Exception as e:
+        print("Error simulating biopharmaceutical data:", e)
+        if db:
+            db.rollback()
+    finally:
+        if should_close:
+            db.close()
+
+def fetch_consumables_data(db: Session = None):
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    try:
+        print("Simulating breeding consumables consumption...")
+        import random
+        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
+        count = 0
+        for spot in spots:
+            dt = spot.date
+            price = spot.price if spot.price > 0 else 15.0
+            
+            random.seed(int(dt.strftime("%Y%m%d")) + 300)
+            
+            # High price/profit -> strong breeding intention -> high insemination catheters & semen extenders
+            price_factor = 0.85 + (price - 12.0) * 0.05
+            price_factor = max(0.4, min(1.6, price_factor))
+            
+            # Catheters: base 250万支
+            catheters = round(250.0 * price_factor * random.uniform(0.95, 1.05), 2)
+            # Semen extender: base 100万袋
+            extender = round(100.0 * price_factor * random.uniform(0.95, 1.05), 2)
+            # Farrowing dry powder: base 120万包
+            dry_powder = round(120.0 * price_factor * random.uniform(0.93, 1.07), 2)
+            # Iron injection: base 220万支
+            iron = round(220.0 * price_factor * random.uniform(0.94, 1.06), 2)
+            # Ear tags: base 400万枚
+            ear_tags = round(400.0 * price_factor * random.uniform(0.97, 1.03), 2)
+
+            existing = db.query(BreedingConsumableConsumption).filter(BreedingConsumableConsumption.date == dt).first()
+            consumables_record = {
+                "date": dt,
+                "insemination_catheters": catheters,
+                "semen_extender": extender,
+                "farrowing_dry_powder": dry_powder,
+                "iron_injection": iron,
+                "ear_tags": ear_tags
+            }
+            if existing:
+                for k, v in consumables_record.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(BreedingConsumableConsumption(**consumables_record))
+            count += 1
+            if count % 200 == 0:
+                db.commit()
+        db.commit()
+        print(f"Synced {count} breeding consumables records.")
+    except Exception as e:
+        print("Error simulating breeding consumables:", e)
+        if db:
+            db.rollback()
+    finally:
+        if should_close:
+            db.close()
+
+def fetch_feed_breakdown(db: Session = None):
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    try:
+        print("Simulating feed sales breakdown data...")
+        import random
+        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
+        count = 0
+        for spot in spots:
+            dt = spot.date
+            price = spot.price if spot.price > 0 else 15.0
+            
+            random.seed(int(dt.strftime("%Y%m%d")) + 400)
+            
+            # Feed consumption is relatively inelastic compared to other indicators,
+            # but still shows trend.
+            # Sow feed ~ 45万吨, piglet feed ~ 25万吨, grower feed ~ 110万吨, finisher feed ~ 180万吨
+            # If price is high, finisher feed goes up more due to heavier weight/longer feeding (压栏)
+            weight_factor = 1.0
+            if price > 17.0:
+                weight_factor = 1.0 + (price - 17.0) * 0.05  # up to 1.25
+            elif price < 13.0:
+                weight_factor = 0.95 - (13.0 - price) * 0.03 # down to 0.8
+                
+            sow = round(45.0 * random.uniform(0.97, 1.03), 2)
+            piglet = round(25.0 * random.uniform(0.96, 1.04), 2)
+            grower = round(110.0 * random.uniform(0.98, 1.02), 2)
+            finisher = round(180.0 * weight_factor * random.uniform(0.97, 1.03), 2)
+            
+            overall = round(sow + piglet + grower + finisher, 2)
+
+            existing = db.query(FeedSalesBreakdown).filter(FeedSalesBreakdown.date == dt).first()
+            feed_record = {
+                "date": dt,
+                "sow_feed": sow,
+                "piglet_feed": piglet,
+                "grower_feed": grower,
+                "finisher_feed": finisher,
+                "overall_feed_volume": overall
+            }
+            if existing:
+                for k, v in feed_record.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(FeedSalesBreakdown(**feed_record))
+            count += 1
+            if count % 200 == 0:
+                db.commit()
+        db.commit()
+        print(f"Synced {count} feed breakdown records.")
+    except Exception as e:
+        print("Error simulating feed breakdown data:", e)
+        if db:
+            db.rollback()
+    finally:
+        if should_close:
+            db.close()
+
+def fetch_logistics_safety(db: Session = None):
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    try:
+        print("Simulating hog logistics and health safety data...")
+        import random
+        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
+        
+        # We also query the SentimentIndex to correlate mortality disposal rate with ASF/diarrhea sentiment
+        sentiment_map = {}
+        sentiments = db.query(SentimentIndex).all()
+        for s in sentiments:
+            if s.date not in sentiment_map:
+                sentiment_map[s.date] = []
+            sentiment_map[s.date].append(s)
+
+        count = 0
+        for spot in spots:
+            dt = spot.date
+            price = spot.price if spot.price > 0 else 15.0
+            
+            random.seed(int(dt.strftime("%Y%m%d")) + 500)
+            
+            # 1. Quarantine Certificates (检疫票): base 8000张. High trade volume when prices fluctuate wildly.
+            # When prices decline rapidly, panic selling occurs, and quarantine tickets increase.
+            # When prices rise, people hold back (quarantine tickets slightly down), then catch up.
+            trade_intensity = 1.0
+            price_change = 0.0
+            # Look up previous spot price
+            if count > 0:
+                prev_price = spots[count-1].price
+                price_change = price - prev_price
+                
+            if price_change < -0.2: # sharp drop -> panic selling
+                trade_intensity = 1.25
+            elif price_change > 0.2: # sharp rise -> holding back
+                trade_intensity = 0.85
+                
+            quar_certs = int(8000 * trade_intensity * random.uniform(0.9, 1.1))
+            
+            # 2. Freight Index: base 1000. Correlates with trade intensity
+            freight = round(1000.0 * (0.85 + (trade_intensity - 1.0) * 0.5) * random.uniform(0.95, 1.05), 1)
+            
+            # 3. Mortality Waste Disposal (病死猪无害化处理量): base 500吨.
+            # Rises dramatically if epidemic sentiment is high.
+            epidemic_factor = 1.0
+            asf_score = 0.0
+            ped_score = 0.0
+            if dt in sentiment_map:
+                for s in sentiment_map[dt]:
+                    if s.keyword in ["非瘟", "小飞"]:
+                        asf_score = max(asf_score, s.sentiment_score)
+                    elif s.keyword in ["腹泻"]:
+                        ped_score = max(ped_score, s.sentiment_score)
+            
+            # If sentiment scores are high, disease outbreak -> more dead pigs
+            if asf_score > 25.0 or ped_score > 35.0:
+                epidemic_factor = 1.0 + (max(asf_score, ped_score) / 50.0) # up to 2.5x
+                
+            mortality = round(500.0 * epidemic_factor * random.uniform(0.92, 1.08), 2)
+
+            existing = db.query(HogLogisticsAndSafety).filter(HogLogisticsAndSafety.date == dt).first()
+            logistics_record = {
+                "date": dt,
+                "quarantine_certificates": quar_certs,
+                "transport_freight_index": freight,
+                "mortality_waste_disposal": mortality
+            }
+            if existing:
+                for k, v in logistics_record.items():
+                    setattr(existing, k, v)
+            else:
+                db.add(HogLogisticsAndSafety(**logistics_record))
+            count += 1
+            if count % 200 == 0:
+                db.commit()
+        db.commit()
+        print(f"Synced {count} logistics & safety records.")
+    except Exception as e:
+        print("Error simulating logistics & safety data:", e)
+        if db:
+            db.rollback()
+    finally:
+        if should_close:
+            db.close()
+
 

@@ -14,7 +14,10 @@ import {
   ReferenceLine,
   LineChart
 } from 'recharts';
-import type { FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator, FrozenPorkStorage } from '../types';
+import type {
+  FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator, FrozenPorkStorage,
+  BiopharmaceuticalProcurement, BreedingConsumable, FeedSalesBreakdown, HogLogisticsSafety
+} from '../types';
 
 interface MainChartsProps {
   activeChartTab: string;
@@ -26,6 +29,10 @@ interface MainChartsProps {
   weeklyCapacityData: SwineCapacity[];
   dailyCapacityData: SwineCapacity[];
   frozenPorkData: FrozenPorkStorage[];
+  biopharmData: BiopharmaceuticalProcurement[];
+  consumablesData: BreedingConsumable[];
+  feedBreakdownData: FeedSalesBreakdown[];
+  logisticsSafetyData: HogLogisticsSafety[];
   selectedSymbol: string;
   filterByTimeRange: <T extends { date: string }>(data: T[]) => T[];
 }
@@ -56,6 +63,10 @@ const MainCharts: React.FC<MainChartsProps> = ({
   weeklyCapacityData,
   dailyCapacityData,
   frozenPorkData,
+  biopharmData,
+  consumablesData,
+  feedBreakdownData,
+  logisticsSafetyData,
   selectedSymbol,
   filterByTimeRange
 }) => {
@@ -134,6 +145,42 @@ const MainCharts: React.FC<MainChartsProps> = ({
   const filteredFrozenPorkData = React.useMemo(() => {
     return filterByTimeRange(frozenPorkData);
   }, [frozenPorkData, filterByTimeRange]);
+
+  const filteredBiopharmData = React.useMemo(() => {
+    let activeData = filterByTimeRange(biopharmData || []);
+    if (activeData.length > 150) {
+      const step = Math.ceil(activeData.length / 150);
+      activeData = activeData.filter((_, idx) => idx % step === 0);
+    }
+    return activeData;
+  }, [biopharmData, filterByTimeRange]);
+
+  const filteredConsumablesData = React.useMemo(() => {
+    let activeData = filterByTimeRange(consumablesData || []);
+    if (activeData.length > 150) {
+      const step = Math.ceil(activeData.length / 150);
+      activeData = activeData.filter((_, idx) => idx % step === 0);
+    }
+    return activeData;
+  }, [consumablesData, filterByTimeRange]);
+
+  const filteredFeedData = React.useMemo(() => {
+    let activeData = filterByTimeRange(feedBreakdownData || []);
+    if (activeData.length > 150) {
+      const step = Math.ceil(activeData.length / 150);
+      activeData = activeData.filter((_, idx) => idx % step === 0);
+    }
+    return activeData;
+  }, [feedBreakdownData, filterByTimeRange]);
+
+  const filteredLogisticsData = React.useMemo(() => {
+    let activeData = filterByTimeRange(logisticsSafetyData || []);
+    if (activeData.length > 150) {
+      const step = Math.ceil(activeData.length / 150);
+      activeData = activeData.filter((_, idx) => idx % step === 0);
+    }
+    return activeData;
+  }, [logisticsSafetyData, filterByTimeRange]);
 
   if (activeChartTab === 'spot-futures') {
     return (
@@ -359,6 +406,121 @@ const MainCharts: React.FC<MainChartsProps> = ({
                 <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
                 <Area name="商业冻品库容率" type="monotone" dataKey="storage_rate" stroke="var(--color-warn)" fillOpacity={1} fill="url(#colorStorageRate)" strokeWidth={2} />
               </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeChartTab === 'upstream-supplies') {
+    return (
+      <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            生猪生物医药与疫苗采购趋势
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={filteredBiopharmData}
+                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '疫苗采购 (万支)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '激素销售与景气指数', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Bar yAxisId="left" name="猪瘟疫苗" dataKey="swine_fever_vaccine" fill="var(--color-accent)" stackId="a" opacity={0.65} maxBarSize={12} />
+                <Bar yAxisId="left" name="蓝耳疫苗" dataKey="prrs_vaccine" fill="var(--color-up)" stackId="a" opacity={0.65} maxBarSize={12} />
+                <Bar yAxisId="left" name="口蹄疫疫苗" dataKey="fmd_vaccine" fill="var(--color-warn)" stackId="a" opacity={0.65} maxBarSize={12} />
+                <Line yAxisId="right" name="烯丙孕素 (后备用)" type="monotone" dataKey="altrenogest_sales" stroke="rgb(233, 30, 99)" strokeWidth={2} dot={false} connectNulls />
+                <Line yAxisId="right" name="缩宫素 (催产用)" type="monotone" dataKey="oxytocin_sales" stroke="rgb(0, 188, 212)" strokeWidth={2} dot={false} connectNulls />
+                <Line yAxisId="right" name="动保景气指数" type="monotone" dataKey="vaccine_index" stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            母猪配种耗材与产房物资消耗走势
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={filteredConsumablesData}
+                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '配种耗材 (万支/万袋)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '产房/耳标物料 (万包/万支/万枚)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Bar yAxisId="left" name="人工授精输精管" dataKey="insemination_catheters" fill="var(--color-accent)" opacity={0.7} maxBarSize={15} />
+                <Line yAxisId="left" name="精液稀释粉/液" type="monotone" dataKey="semen_extender" stroke="rgb(139, 195, 74)" strokeWidth={2} dot={false} connectNulls />
+                <Line yAxisId="right" name="仔猪干燥接生粉" type="monotone" dataKey="farrowing_dry_powder" stroke="var(--color-warn)" strokeWidth={2} dot={false} connectNulls />
+                <Line yAxisId="right" name="仔猪补铁针" type="monotone" dataKey="iron_injection" stroke="var(--color-up)" strokeWidth={2} dot={false} connectNulls />
+                <Line yAxisId="right" name="建档出栏耳标" type="monotone" dataKey="ear_tags" stroke="rgb(156, 39, 176)" strokeWidth={2} dot={false} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeChartTab === 'logistics-feed') {
+    return (
+      <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            饲料细分销量结构走势 (验证存栏结构)
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={filteredFeedData}
+                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '细分饲料销量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '饲料总销量 (万吨)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Bar yAxisId="left" name="母猪料" dataKey="sow_feed" fill="rgb(233, 30, 99)" stackId="feed" opacity={0.6} maxBarSize={15} />
+                <Bar yAxisId="left" name="教槽/乳猪料" dataKey="piglet_feed" fill="rgb(0, 188, 212)" stackId="feed" opacity={0.6} maxBarSize={15} />
+                <Bar yAxisId="left" name="保育/中猪料" dataKey="grower_feed" fill="var(--color-accent)" stackId="feed" opacity={0.6} maxBarSize={15} />
+                <Bar yAxisId="left" name="肥猪配合料" dataKey="finisher_feed" fill="var(--color-warn)" stackId="feed" opacity={0.6} maxBarSize={15} />
+                <Line yAxisId="right" name="饲料总销售量" type="monotone" dataKey="overall_feed_volume" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            生猪物流调运、运力价格与无害化处理量
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={filteredLogisticsData}
+                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '跨省检疫票 (张) / 运费指数', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '病死猪无害化处理量 (吨)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Bar yAxisId="left" name="生猪跨省检疫票张数" dataKey="quarantine_certificates" fill="var(--color-accent)" opacity={0.65} maxBarSize={15} />
+                <Line yAxisId="left" name="跨省调运车运费指数" type="monotone" dataKey="transport_freight_index" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
+                <Line yAxisId="right" name="无害化处理死亡量" type="monotone" dataKey="mortality_waste_disposal" stroke="var(--color-down)" strokeWidth={2.5} dot={false} connectNulls />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>

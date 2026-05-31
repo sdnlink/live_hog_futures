@@ -160,3 +160,52 @@ class FrozenPorkStorage(Base):
     commercial_inventory = Column(Float, nullable=True)    # 商业冻品库存估算量 (万吨)
     storage_rate = Column(Float, nullable=True)            # 冻品库容率 (%)
 
+class BiopharmaceuticalProcurement(Base):
+    """生物医药及动保用品采购监控表"""
+    __tablename__ = "biopharmaceutical_procurements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    swine_fever_vaccine = Column(Float, nullable=True)         # 猪瘟疫苗采购量 (万支)
+    prrs_vaccine = Column(Float, nullable=True)                # 蓝耳疫苗采购量 (万支)
+    fmd_vaccine = Column(Float, nullable=True)                 # 口蹄疫疫苗采购量 (万支)
+    diarrhea_vaccine = Column(Float, nullable=True)            # 流行性腹泻疫苗 (万支)
+    altrenogest_sales = Column(Float, nullable=True)           # 烯丙孕素销售量 (万支)
+    oxytocin_sales = Column(Float, nullable=True)              # 缩宫素销售量 (万支)
+    vaccine_index = Column(Float, nullable=True)               # 动保景气度综合指数
+
+class BreedingConsumableConsumption(Base):
+    """母猪繁育及产房辅助用品消耗监控表"""
+    __tablename__ = "breeding_consumable_consumptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    insemination_catheters = Column(Float, nullable=True)      # 输精管领用消耗量 (万支)
+    semen_extender = Column(Float, nullable=True)              # 精液稀释剂消耗量 (万袋)
+    farrowing_dry_powder = Column(Float, nullable=True)        # 接生粉干燥粉消耗量 (万包)
+    iron_injection = Column(Float, nullable=True)              # 补铁针剂消耗量 (万支)
+    ear_tags = Column(Float, nullable=True)                    # 耳标领用/消耗量 (万枚)
+
+class FeedSalesBreakdown(Base):
+    """饲料细分产品销量表"""
+    __tablename__ = "feed_sales_breakdowns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    sow_feed = Column(Float, nullable=True)                    # 母猪配合料销量 (万吨)
+    piglet_feed = Column(Float, nullable=True)                 # 教槽/乳猪料销量 (万吨)
+    grower_feed = Column(Float, nullable=True)                 # 保育/中猪料销量 (万吨)
+    finisher_feed = Column(Float, nullable=True)               # 肥猪配合料销量 (万吨)
+    overall_feed_volume = Column(Float, nullable=True)         # 饲料总销量 (万吨)
+
+class HogLogisticsAndSafety(Base):
+    """生猪物流调运与安全监控表"""
+    __tablename__ = "hog_logistics_and_safety"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    quarantine_certificates = Column(Integer, nullable=True)   # 生猪调运跨省检疫票发放数 (张)
+    transport_freight_index = Column(Float, nullable=True)     # 跨省运猪车运费指数 (基期1000)
+    mortality_waste_disposal = Column(Float, nullable=True)    # 病死猪无害化处理量 (吨)
+
+

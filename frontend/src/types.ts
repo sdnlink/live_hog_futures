@@ -235,3 +235,44 @@ export interface ExpertAdvice {
     traders: { title: string; action: string; bullets: string[] };
   };
 }
+
+export interface BiopharmaceuticalProcurement {
+  id: number;
+  date: string;
+  swine_fever_vaccine: number | null;
+  prrs_vaccine: number | null;
+  fmd_vaccine: number | null;
+  diarrhea_vaccine: number | null;
+  altrenogest_sales: number | null;
+  oxytocin_sales: number | null;
+  vaccine_index: number | null;
+}
+
+export interface BreedingConsumable {
+  id: number;
+  date: string;
+  insemination_catheters: number | null;
+  semen_extender: number | null;
+  farrowing_dry_powder: number | null;
+  iron_injection: number | null;
+  ear_tags: number | null;
+}
+
+export interface FeedSalesBreakdown {
+  id: number;
+  date: string;
+  sow_feed: number | null;
+  piglet_feed: number | null;
+  grower_feed: number | null;
+  finisher_feed: number | null;
+  overall_feed_volume: number | null;
+}
+
+export interface HogLogisticsSafety {
+  id: number;
+  date: string;
+  quarantine_certificates: number | null;
+  transport_freight_index: number | null;
+  mortality_waste_disposal: number | null;
+}
+
