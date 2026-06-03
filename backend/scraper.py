@@ -41,7 +41,8 @@ from .models import (
     BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice,
     StockKline, StockQuote, FrozenPorkStorage,
     BiopharmaceuticalProcurement, BreedingConsumableConsumption,
-    FeedSalesBreakdown, HogLogisticsAndSafety, CompanyMonthlySales
+    FeedSalesBreakdown, HogLogisticsAndSafety, CompanyMonthlySales,
+    PorkDownstreamDemand
 )
 
 # Active contract list for live hog (LH)
@@ -298,46 +299,6 @@ def fetch_spot_prices(db: Session = None):
         db.commit()
         print(f"Synced {recent_count} recent daily spot price entries.")
         
-        # Project SpotPrice for the next 5 days (today + 1 to today + 5) incorporating Douyin/Toutiao sentiment adjustments
-        today_date = datetime.date.today()
-        latest_spot = db.query(SpotPrice).filter(SpotPrice.date <= today_date).order_by(SpotPrice.date.desc()).first()
-        if latest_spot:
-            import random
-            last_price = latest_spot.price
-            
-            # Fetch latest Douyin, Toutiao, and Forum sentiment scores to calculate social adjustment factor
-            douyin_sent = db.query(SentimentIndex).filter(SentimentIndex.date == today_date, SentimentIndex.keyword == "抖音#生猪价格 涨跌比").first()
-            toutiao_sent = db.query(SentimentIndex).filter(SentimentIndex.date == today_date, SentimentIndex.keyword == "今日头条 养殖户抛售声量").first()
-            forum_sent = db.query(SentimentIndex).filter(SentimentIndex.date == today_date, SentimentIndex.keyword == "行业论坛 散户二育意愿").first()
-            
-            dy_score = douyin_sent.sentiment_score if douyin_sent else 60.0
-            tt_score = toutiao_sent.sentiment_score if toutiao_sent else 40.0
-            fr_score = forum_sent.sentiment_score if forum_sent else 50.0
-            
-            # Calculate dynamic sentiment drift:
-            # High Douyin bullish ratio (>60%) and high forum二育 intent (>50%) drive prices UP (holding hogs, entering二育)
-            # High Toutiao panic selling (>40%) drives prices DOWN
-            sentiment_adjustment = (dy_score - 60.0) * 0.002 + (fr_score - 50.0) * 0.003 - (tt_score - 40.0) * 0.003
-            sentiment_adjustment = max(-0.05, min(0.05, sentiment_adjustment))
-            
-            print(f">>> [Forecast Model] Social Media Sentiment Adjustment Factor: {sentiment_adjustment:+.4f} CNY/kg")
-            print(f"    (Douyin Bullish Ratio: {dy_score}%, Toutiao Panic Selling: {tt_score}%, Forum 二育 Intent: {fr_score}%)")
-            
-            for i in range(1, 6):
-                proj_date = today_date + datetime.timedelta(days=i)
-                random.seed(int(proj_date.strftime("%Y%m%d")) + 10)
-                # Random walk with sentiment adjustment drift
-                proj_price = round(last_price + sentiment_adjustment + random.uniform(-0.03, 0.03), 2)
-                
-                existing = db.query(SpotPrice).filter(SpotPrice.date == proj_date).first()
-                if existing:
-                    existing.price = proj_price
-                else:
-                    db.add(SpotPrice(date=proj_date, price=proj_price))
-                last_price = proj_price
-            db.commit()
-            print("Projected SpotPrice for the next 5 days (incorporating Douyin and Toutiao sentiment adjustments).")
-        
         # Calculate basis relative to LH0 (or active contract if available)
         update_basis_values(db)
         
@@ -378,29 +339,7 @@ def fetch_pork_prices(db: Session = None):
         db.commit()
         print(f"Synced {count} wholesale pork price entries from AkShare.")
         
-        # Project forward if AkShare data is lagging or for future forecast days
-        latest_date = max([d for d in parsed_dates if d is not None], default=datetime.date(2026, 5, 9))
-        today = datetime.date.today()
-        max_proj_date = today + datetime.timedelta(days=5)
-        if latest_date < max_proj_date:
-            print(f"Pork wholesale prices lagging. Projecting up to {max_proj_date}...")
-            # Find all SpotPrice dates after latest_date up to max_proj_date
-            spots_after = db.query(SpotPrice).filter(SpotPrice.date > latest_date, SpotPrice.date <= max_proj_date).order_by(SpotPrice.date.asc()).all()
-            for spot in spots_after:
-                # Correlate pork price with spot price (wholesale pork is roughly 1.35 to 1.55 times the spot pig price)
-                # Let's compute a dynamic price: spot.price * 1.38 + minor random fluctuation
-                import random
-                random.seed(int(spot.date.strftime("%Y%m%d")) + 50)
-                projected_price = round(spot.price * 1.38 + random.uniform(-0.15, 0.15), 2)
-                
-                existing = db.query(PorkPrice).filter(PorkPrice.date == spot.date).first()
-                if existing:
-                    existing.price = projected_price
-                else:
-                    db.add(PorkPrice(date=spot.date, price=projected_price))
-                    
-            db.commit()
-            print(f"Projected wholesale pork prices up to {max_proj_date}.")
+        pass
             
     except Exception as e:
         print("Error fetching wholesale pork prices:", e)
@@ -741,167 +680,8 @@ def fetch_swine_capacity(db: Session = None):
                 db.add(SwineCapacity(**capacity_data))
             count += 1
             
-        # Project forward to the current month in 2026 if AkShare data is lagging
-        latest_date = max([d for d in parsed_dates if d is not None], default=datetime.date(2025, 10, 31))
-        today = datetime.date.today()
-        
-        if latest_date < today:
-            current_yr = latest_date.year
-            current_mo = latest_date.month
-            
-            # Start sow inventory from the last known value
-            last_sow = 3990.0
-            latest_record = db.query(SwineCapacity).filter(SwineCapacity.date == latest_date).first()
-            if latest_record and latest_record.maternal_sow_inventory:
-                last_sow = latest_record.maternal_sow_inventory
-                
-            while True:
-                if current_mo == 12:
-                    current_yr += 1
-                    current_mo = 1
-                else:
-                    current_mo += 1
-                    
-                # End of month date
-                if current_mo == 12:
-                    next_date = datetime.date(current_yr, 12, 31)
-                else:
-                    next_date = datetime.date(current_yr, current_mo + 1, 1) - datetime.timedelta(days=1)
-                    
-                if next_date > today and next_date.month != today.month:
-                    break
-                    
-                # --- START OF CROSS-VALIDATION & FORECAST ALGORITHM ---
-                # 1. Listed Companies Sales growth (from CompanyMonthlySales)
-                # Compute total listed sales volume for this month vs previous month
-                this_month_listed = db.query(func.sum(CompanyMonthlySales.sales_volume)).filter(
-                    CompanyMonthlySales.date >= next_date - datetime.timedelta(days=31),
-                    CompanyMonthlySales.date <= next_date
-                ).scalar() or 0.0
-                
-                prev_month_listed = db.query(func.sum(CompanyMonthlySales.sales_volume)).filter(
-                    CompanyMonthlySales.date >= next_date - datetime.timedelta(days=62),
-                    CompanyMonthlySales.date <= next_date - datetime.timedelta(days=28)
-                ).scalar() or 0.0
-                
-                listed_growth = 0.0
-                if prev_month_listed > 0.0:
-                    listed_growth = (this_month_listed - prev_month_listed) / prev_month_listed
-
-                # 2. Social Media Douyin/Toutiao Sentiment adjustments (from SentimentIndex)
-                douyin_sent = db.query(SentimentIndex).filter(
-                    SentimentIndex.date >= next_date - datetime.timedelta(days=31),
-                    SentimentIndex.date <= next_date,
-                    SentimentIndex.keyword == "抖音#生猪价格 涨跌比"
-                ).order_by(SentimentIndex.date.desc()).first()
-
-                toutiao_sent = db.query(SentimentIndex).filter(
-                    SentimentIndex.date >= next_date - datetime.timedelta(days=31),
-                    SentimentIndex.date <= next_date,
-                    SentimentIndex.keyword == "今日头条 养殖户抛售声量"
-                ).order_by(SentimentIndex.date.desc()).first()
-
-                forum_sent = db.query(SentimentIndex).filter(
-                    SentimentIndex.date >= next_date - datetime.timedelta(days=31),
-                    SentimentIndex.date <= next_date,
-                    SentimentIndex.keyword == "行业论坛 散户二育意愿"
-                ).order_by(SentimentIndex.date.desc()).first()
-
-                dy_score = douyin_sent.sentiment_score if douyin_sent else 60.0
-                tt_score = toutiao_sent.sentiment_score if toutiao_sent else 40.0
-                fr_score = forum_sent.sentiment_score if forum_sent else 50.0
-
-                # High Douyin bullish / Forum二育 intent keeps inventory in place; High Toutiao panic selling exits early.
-                sentiment_adjustment = (dy_score - 60.0) * 0.0003 + (fr_score - 50.0) * 0.0004 - (tt_score - 40.0) * 0.0004
-                sentiment_adjustment = max(-0.015, min(0.015, sentiment_adjustment))
-
-                # 3. Third-party channels (Biopharm & Consumables proxies)
-                this_biopharm = db.query(BiopharmaceuticalProcurement).filter(
-                    BiopharmaceuticalProcurement.date >= next_date - datetime.timedelta(days=31),
-                    BiopharmaceuticalProcurement.date <= next_date
-                ).order_by(BiopharmaceuticalProcurement.date.desc()).first()
-
-                prev_date_limit = next_date - datetime.timedelta(days=28)
-                prev_biopharm = db.query(BiopharmaceuticalProcurement).filter(
-                    BiopharmaceuticalProcurement.date >= next_date - datetime.timedelta(days=62),
-                    BiopharmaceuticalProcurement.date <= prev_date_limit
-                ).order_by(BiopharmaceuticalProcurement.date.desc()).first()
-
-                this_consumables = db.query(BreedingConsumableConsumption).filter(
-                    BreedingConsumableConsumption.date >= next_date - datetime.timedelta(days=31),
-                    BreedingConsumableConsumption.date <= next_date
-                ).order_by(BreedingConsumableConsumption.date.desc()).first()
-
-                prev_consumables = db.query(BreedingConsumableConsumption).filter(
-                    BreedingConsumableConsumption.date >= next_date - datetime.timedelta(days=62),
-                    BreedingConsumableConsumption.date <= next_date - datetime.timedelta(days=28)
-                ).order_by(BreedingConsumableConsumption.date.desc()).first()
-
-                bio_growth = 0.0
-                if this_biopharm and prev_biopharm and prev_biopharm.vaccine_index and this_biopharm.vaccine_index:
-                    vi_growth = (this_biopharm.vaccine_index - prev_biopharm.vaccine_index) / prev_biopharm.vaccine_index
-                    bio_growth += vi_growth * 0.05
-
-                if this_consumables and prev_consumables and prev_consumables.insemination_catheters and this_consumables.insemination_catheters:
-                    cath_growth = (this_consumables.insemination_catheters - prev_consumables.insemination_catheters) / prev_consumables.insemination_catheters
-                    bio_growth += cath_growth * 0.08
-
-                bio_growth = max(-0.01, min(0.01, bio_growth))
-
-                # Combine factors to adjust sow inventory decline/growth rate (Baseline: -0.35% monthly)
-                base_change = -0.0035
-                sow_change_rate = base_change + listed_growth * 0.02 + sentiment_adjustment + bio_growth
-                sow_change_rate = max(-0.02, min(0.015, sow_change_rate))
-
-                last_sow = round(last_sow * (1 + sow_change_rate), 1)
-
-                # Dynamic hog-to-sow multiplier (baseline: 10.5)
-                hog_sow_mult = 10.5 * (1 + listed_growth * 0.05 + (dy_score - 60.0) * 0.002 + (fr_score - 50.0) * 0.003 - (tt_score - 40.0) * 0.003)
-                hog_sow_mult = max(10.0, min(11.2, hog_sow_mult))
-
-                hog_inv = round(last_sow * hog_sow_mult, 2)
-                pork_prod = round(last_sow * 0.117, 2)
-                hog_slaughter = round(last_sow * 1.45, 2)
-                # --- END OF CROSS-VALIDATION & FORECAST ALGORITHM ---
-                
-                if current_mo in [12, 1, 2, 3]:
-                    pork_cons = round(pork_prod * 0.98 if current_mo != 12 else pork_prod * 1.05, 2)
-                elif current_mo in [4, 5, 6]:
-                    pork_cons = round(pork_prod * 1.01, 2)
-                else:
-                    pork_cons = round(pork_prod * 1.02, 2)
-                        
-                # Calculate slaughterhouse values
-                slaught_vol = round(hog_slaughter * 0.35, 2) if hog_slaughter else None
-                m = next_date.month
-                rates_base = {1: 35.5, 2: 30.2, 3: 23.5, 4: 24.0, 5: 24.5, 6: 24.8, 7: 25.2, 8: 25.8, 9: 26.5, 10: 27.8, 11: 30.5, 12: 36.8}
-                yr_fluc = (next_date.year % 5) * 0.4 - 0.8
-                slaught_rate = round(rates_base[m] + yr_fluc, 2) if hog_slaughter else None
-
-                existing = db.query(SwineCapacity).filter(SwineCapacity.date == next_date).first()
-                capacity_data = {
-                    "date": next_date,
-                    "maternal_sow_inventory": last_sow,
-                    "pork_production": pork_prod,
-                    "hog_slaughter": hog_slaughter,
-                    "hog_inventory": hog_inv,
-                    "pork_consumption": pork_cons,
-                    "slaughterhouse_volume": slaught_vol,
-                    "slaughterhouse_operating_rate": slaught_rate
-                }
-                
-                if existing:
-                    for k, v in capacity_data.items():
-                        setattr(existing, k, v)
-                else:
-                    db.add(SwineCapacity(**capacity_data))
-                count += 1
-                
-                if next_date.year == today.year and next_date.month == today.month:
-                    break
-                    
         db.commit()
-        logger.info(f"Synced {count} swine capacity index data points (including forward projections).")
+        logger.info(f"Synced {count} swine capacity index data points.")
     except Exception as e:
         logger.error(f"Error fetching swine capacity: {e}", exc_info=True)
         if db:
@@ -1151,102 +931,7 @@ def fetch_epidemic_reports(db: Session = None):
 
 
 def fetch_sentiment_radar(db: Session = None):
-    """
-    Fetch and analyze discussions, search indices, and comments from social media platforms
-    (Douyin comments, Toutiao trends, and farming forums) to estimate market sentiment.
-    """
-    should_close = False
-    if db is None:
-        db = SessionLocal()
-        should_close = True
-        
-    try:
-        today = datetime.date.today()
-        print(">>> [Social Media Sentiment Crawler] Initializing sentiment analysis...")
-        print(">>> [Douyin Crawler] Querying Douyin search statistics for hashtags: #生猪价格, #养猪, #二育...")
-        print(">>> [Douyin Crawler] Analyzing user comments for bullish/bearish sentiments...")
-        print(">>> [Toutiao Crawler] Scraping Toutiao news content, search volume index, and articles for '能繁母猪', '猪流感', '抛售'...")
-        print(">>> [Farming Forums] Extracting user posting frequencies and sentiment keywords from Zhujiage, Soozhu forums...")
-        
-        import random
-        
-        # Populate sentiment index for past 30 days up to next 5 days to align with spot price forecasting range
-        for day_offset in range(-30, 6):
-            target_date = today + datetime.timedelta(days=day_offset)
-            # Use seed dependent on date to ensure consistency
-            random.seed(int(target_date.strftime("%Y%m%d")) + 800)
-            
-            # Correlate sentiment with spot price if exists in DB to look realistic
-            spot = db.query(SpotPrice).filter(SpotPrice.date == target_date).first()
-            price = spot.price if spot else 15.0
-            
-            # Base variables based on price trend
-            is_rising = price >= 15.0
-            
-            # Generate Douyin Bullish/Bearish Ratio (grows with spot price)
-            douyin_score = round(60.0 + random.uniform(-8.0, 8.0) + (price - 14.5) * 3.5, 1)
-            douyin_score = max(20.0, min(95.0, douyin_score))
-            douyin_freq = random.randint(12000, 28000)
-            
-            # Toutiao Panic Selling Volume (higher when prices are low/dropping)
-            toutiao_score = round(40.0 + random.uniform(-10.0, 10.0) - (price - 14.5) * 4.0, 1)
-            toutiao_score = max(10.0, min(90.0, toutiao_score))
-            toutiao_freq = random.randint(9000, 19000)
-            
-            # Forum Second Fattening Intent (higher when prices are higher)
-            forum_score = round(50.0 + random.uniform(-12.0, 12.0) + (price - 14.5) * 5.0, 1)
-            forum_score = max(15.0, min(95.0, forum_score))
-            forum_freq = random.randint(3000, 8000)
-            
-            feiwun_score = round(15.0 + random.uniform(0.0, 15.0), 1)
-            fuxie_score = round(20.0 + random.uniform(0.0, 20.0), 1)
-            
-            yalan_score = round(40.0 + (price - 13.5) * 5.5 + random.uniform(-5.0, 5.0), 1)
-            yalan_score = max(10.0, min(95.0, yalan_score))
-            
-            paoshou_score = round(40.0 - (price - 13.5) * 5.5 + random.uniform(-5.0, 5.0), 1)
-            paoshou_score = max(10.0, min(95.0, paoshou_score))
-            
-            keywords_data = [
-                {"keyword": "非瘟", "frequency": random.randint(20, 60), "sentiment_score": feiwun_score},
-                {"keyword": "腹泻", "frequency": random.randint(30, 80), "sentiment_score": fuxie_score},
-                {"keyword": "压栏", "frequency": random.randint(40, 120), "sentiment_score": yalan_score},
-                {"keyword": "抛售", "frequency": random.randint(30, 100), "sentiment_score": paoshou_score},
-                {"keyword": "小飞", "frequency": random.randint(15, 40), "sentiment_score": round(feiwun_score * 0.9, 1)},
-                {"keyword": "咳喘", "frequency": random.randint(20, 50), "sentiment_score": round(fuxie_score * 0.8, 1)},
-                {"keyword": "死猪", "frequency": random.randint(10, 30), "sentiment_score": round(feiwun_score * 0.5, 1)},
-                # Social media specific keywords requested by the user
-                {"keyword": "抖音#生猪价格 涨跌比", "frequency": douyin_freq, "sentiment_score": douyin_score},
-                {"keyword": "今日头条 养殖户抛售声量", "frequency": toutiao_freq, "sentiment_score": toutiao_score},
-                {"keyword": "行业论坛 散户二育意愿", "frequency": forum_freq, "sentiment_score": forum_score}
-            ]
-            
-            for item in keywords_data:
-                existing = db.query(SentimentIndex).filter(
-                    SentimentIndex.date == target_date,
-                    SentimentIndex.keyword == item["keyword"]
-                ).first()
-                
-                if existing:
-                    existing.frequency = item["frequency"]
-                    existing.sentiment_score = item["sentiment_score"]
-                else:
-                    db.add(SentimentIndex(
-                        date=target_date, 
-                        keyword=item["keyword"], 
-                        frequency=item["frequency"], 
-                        sentiment_score=item["sentiment_score"]
-                    ))
-                    
-        db.commit()
-        print(f">>> [Social Media Sentiment] Synced sentiment radar keywords for last 30 days and next 5 days up to {today + datetime.timedelta(days=5)}.")
-    except Exception as e:
-        print("Error fetching sentiment index:", e)
-        if db:
-            db.rollback()
-    finally:
-        if should_close:
-            db.close()
+    pass
 
 # Listed hog companies
 HOG_STOCK_COMPANIES = {
@@ -1570,69 +1255,27 @@ def fetch_frozen_pork_storage(db: Session = None):
             print("No government reserves data returned.")
             df = pd.DataFrame(columns=["date", "value"])
 
-        # 1. Store the reserves data
-        reserve_data = {}
+        count = 0
         for _, row in df.iterrows():
             date_val = parse_date(row['date'])
             val = float(row['value'])
-            reserve_data[date_val] = val
-
-        # 2. Match with SpotPrice dates to estimate continuous commercial inventory
-        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
-
-        import random
-        count = 0
-        for spot in spots:
-            date_val = spot.date
-            reserve_vol = reserve_data.get(date_val, 0.0)
-
-            # Base storage rate depending on price: lower price -> higher storage rate
-            price = spot.price
-            if price <= 0:
-                price = 15.0
-            base_rate = 35.0 - (price - 10.0) * 1.5
-            storage_rate = max(12.0, min(35.0, base_rate))
             
-            # Add small daily fluctuation
-            random.seed(int(date_val.strftime("%Y%m%d")) + 100)
-            storage_rate = round(storage_rate + random.uniform(-0.5, 0.5), 2)
-            
-            # Commercial inventory: e.g. commercial_inventory = storage_rate * 6.8 (万吨)
-            commercial_inv = round(storage_rate * 6.8, 2)
-
             existing = db.query(FrozenPorkStorage).filter(FrozenPorkStorage.date == date_val).first()
             storage_record = {
                 "date": date_val,
-                "reserve_volume": reserve_vol if reserve_vol > 0 else None,
-                "commercial_inventory": commercial_inv,
-                "storage_rate": storage_rate
+                "reserve_volume": val if val > 0 else None,
+                "commercial_inventory": None,
+                "storage_rate": None
             }
-
             if existing:
                 for k, v in storage_record.items():
-                    if k == "reserve_volume" and v is None:
-                        continue
                     setattr(existing, k, v)
             else:
                 db.add(FrozenPorkStorage(**storage_record))
-
             count += 1
-            if count % 200 == 0:
-                db.commit()
-
-        # Also ensure sparse reserve dates that might not be in spot prices are inserted
-        for dt, vol in reserve_data.items():
-            existing = db.query(FrozenPorkStorage).filter(FrozenPorkStorage.date == dt).first()
-            if not existing:
-                db.add(FrozenPorkStorage(
-                    date=dt,
-                    reserve_volume=vol,
-                    commercial_inventory=120.0,
-                    storage_rate=18.0
-                ))
 
         db.commit()
-        print(f"Synced {count} frozen pork storage records (government reserves & estimated commercial inventory).")
+        print(f"Synced {count} government frozen pork reserves records.")
     except Exception as e:
         print("Error in fetch_frozen_pork_storage:", e)
         if db:
@@ -1642,386 +1285,22 @@ def fetch_frozen_pork_storage(db: Session = None):
             db.close()
 
 def fetch_biopharm_data(db: Session = None):
-    should_close = False
-    if db is None:
-        db = SessionLocal()
-        should_close = True
-    try:
-        print("Simulating biopharmaceutical procurement data...")
-        import random
-        # We generate biopharmaceutical procurement matching SpotPrice dates
-        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
-        count = 0
-        for spot in spots:
-            dt = spot.date
-            # Base values dynamically correlated with spot price (profitability drives vaccination and hormone purchasing)
-            price = spot.price if spot.price > 0 else 15.0
-            
-            # Seed based on date to maintain consistency
-            random.seed(int(dt.strftime("%Y%m%d")) + 200)
-            
-            # Swine fever vaccine: base ~ 1200.0万支, PRRS: base ~ 600.0万支, FMD: ~ 800.0万支, Diarrhea: ~ 300.0万支 (higher in winter/spring)
-            # In winter/spring (Nov to Mar), diarrhea vaccine demand increases
-            month = dt.month
-            diarrhea_boost = 1.3 if month in [11, 12, 1, 2, 3] else 0.8
-            
-            # Higher prices -> more vaccine purchasing (better care/higher density)
-            price_factor = 0.8 + (price - 10.0) * 0.04
-            price_factor = max(0.5, min(1.5, price_factor))
-            
-            sf = round(1200.0 * price_factor * random.uniform(0.95, 1.05), 2)
-            prrs = round(600.0 * price_factor * random.uniform(0.94, 1.06), 2)
-            fmd = round(800.0 * price_factor * random.uniform(0.96, 1.04), 2)
-            diar = round(300.0 * price_factor * diarrhea_boost * random.uniform(0.92, 1.08), 2)
-            
-            # Altrenogest (烯丙孕素) sales: drives gilt heat synchronization. High profit -> high altrenogest
-            altren = round(80.0 * price_factor * random.uniform(0.9, 1.1), 2)
-            # Oxytocin (缩宫素): farrowing helper. Follows breeding levels
-            oxyt = round(150.0 * price_factor * random.uniform(0.92, 1.08), 2)
-            
-            # Vaccine index: overall health/vaccine purchase level
-            v_index = round(70.0 * price_factor + random.uniform(-3.0, 3.0), 2)
-            v_index = max(10.0, min(100.0, v_index))
-
-            existing = db.query(BiopharmaceuticalProcurement).filter(BiopharmaceuticalProcurement.date == dt).first()
-            biopharm_record = {
-                "date": dt,
-                "swine_fever_vaccine": sf,
-                "prrs_vaccine": prrs,
-                "fmd_vaccine": fmd,
-                "diarrhea_vaccine": diar,
-                "altrenogest_sales": altren,
-                "oxytocin_sales": oxyt,
-                "vaccine_index": v_index
-            }
-            if existing:
-                for k, v in biopharm_record.items():
-                    setattr(existing, k, v)
-            else:
-                db.add(BiopharmaceuticalProcurement(**biopharm_record))
-            count += 1
-            if count % 200 == 0:
-                db.commit()
-        db.commit()
-        print(f"Synced {count} biopharmaceutical records.")
-    except Exception as e:
-        print("Error simulating biopharmaceutical data:", e)
-        if db:
-            db.rollback()
-    finally:
-        if should_close:
-            db.close()
+    pass
 
 def fetch_consumables_data(db: Session = None):
-    should_close = False
-    if db is None:
-        db = SessionLocal()
-        should_close = True
-    try:
-        print("Simulating breeding consumables consumption...")
-        import random
-        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
-        count = 0
-        for spot in spots:
-            dt = spot.date
-            price = spot.price if spot.price > 0 else 15.0
-            
-            random.seed(int(dt.strftime("%Y%m%d")) + 300)
-            
-            # High price/profit -> strong breeding intention -> high insemination catheters & semen extenders
-            price_factor = 0.85 + (price - 12.0) * 0.05
-            price_factor = max(0.4, min(1.6, price_factor))
-            
-            # Catheters: base 250万支
-            catheters = round(250.0 * price_factor * random.uniform(0.95, 1.05), 2)
-            # Semen extender: base 100万袋
-            extender = round(100.0 * price_factor * random.uniform(0.95, 1.05), 2)
-            # Farrowing dry powder: base 120万包
-            dry_powder = round(120.0 * price_factor * random.uniform(0.93, 1.07), 2)
-            # Iron injection: base 220万支
-            iron = round(220.0 * price_factor * random.uniform(0.94, 1.06), 2)
-            # Ear tags: base 400万枚
-            ear_tags = round(400.0 * price_factor * random.uniform(0.97, 1.03), 2)
-
-            existing = db.query(BreedingConsumableConsumption).filter(BreedingConsumableConsumption.date == dt).first()
-            consumables_record = {
-                "date": dt,
-                "insemination_catheters": catheters,
-                "semen_extender": extender,
-                "farrowing_dry_powder": dry_powder,
-                "iron_injection": iron,
-                "ear_tags": ear_tags
-            }
-            if existing:
-                for k, v in consumables_record.items():
-                    setattr(existing, k, v)
-            else:
-                db.add(BreedingConsumableConsumption(**consumables_record))
-            count += 1
-            if count % 200 == 0:
-                db.commit()
-        db.commit()
-        print(f"Synced {count} breeding consumables records.")
-    except Exception as e:
-        print("Error simulating breeding consumables:", e)
-        if db:
-            db.rollback()
-    finally:
-        if should_close:
-            db.close()
+    pass
 
 def fetch_feed_breakdown(db: Session = None):
-    should_close = False
-    if db is None:
-        db = SessionLocal()
-        should_close = True
-    try:
-        print("Simulating feed sales breakdown data...")
-        import random
-        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
-        count = 0
-        for spot in spots:
-            dt = spot.date
-            price = spot.price if spot.price > 0 else 15.0
-            
-            random.seed(int(dt.strftime("%Y%m%d")) + 400)
-            
-            # Feed consumption is relatively inelastic compared to other indicators,
-            # but still shows trend.
-            # Sow feed ~ 45万吨, piglet feed ~ 25万吨, grower feed ~ 110万吨, finisher feed ~ 180万吨
-            # If price is high, finisher feed goes up more due to heavier weight/longer feeding (压栏)
-            weight_factor = 1.0
-            if price > 17.0:
-                weight_factor = 1.0 + (price - 17.0) * 0.05  # up to 1.25
-            elif price < 13.0:
-                weight_factor = 0.95 - (13.0 - price) * 0.03 # down to 0.8
-                
-            sow = round(45.0 * random.uniform(0.97, 1.03), 2)
-            piglet = round(25.0 * random.uniform(0.96, 1.04), 2)
-            grower = round(110.0 * random.uniform(0.98, 1.02), 2)
-            finisher = round(180.0 * weight_factor * random.uniform(0.97, 1.03), 2)
-            
-            overall = round(sow + piglet + grower + finisher, 2)
-
-            existing = db.query(FeedSalesBreakdown).filter(FeedSalesBreakdown.date == dt).first()
-            feed_record = {
-                "date": dt,
-                "sow_feed": sow,
-                "piglet_feed": piglet,
-                "grower_feed": grower,
-                "finisher_feed": finisher,
-                "overall_feed_volume": overall
-            }
-            if existing:
-                for k, v in feed_record.items():
-                    setattr(existing, k, v)
-            else:
-                db.add(FeedSalesBreakdown(**feed_record))
-            count += 1
-            if count % 200 == 0:
-                db.commit()
-        db.commit()
-        print(f"Synced {count} feed breakdown records.")
-    except Exception as e:
-        print("Error simulating feed breakdown data:", e)
-        if db:
-            db.rollback()
-    finally:
-        if should_close:
-            db.close()
+    pass
 
 def fetch_logistics_safety(db: Session = None):
-    should_close = False
-    if db is None:
-        db = SessionLocal()
-        should_close = True
-    try:
-        print("Simulating hog logistics and health safety data...")
-        import random
-        spots = db.query(SpotPrice).order_by(SpotPrice.date.asc()).all()
-        
-        # We also query the SentimentIndex to correlate mortality disposal rate with ASF/diarrhea sentiment
-        sentiment_map = {}
-        sentiments = db.query(SentimentIndex).all()
-        for s in sentiments:
-            if s.date not in sentiment_map:
-                sentiment_map[s.date] = []
-            sentiment_map[s.date].append(s)
-
-        count = 0
-        for spot in spots:
-            dt = spot.date
-            price = spot.price if spot.price > 0 else 15.0
-            
-            random.seed(int(dt.strftime("%Y%m%d")) + 500)
-            
-            # 1. Quarantine Certificates (检疫票): base 8000张. High trade volume when prices fluctuate wildly.
-            # When prices decline rapidly, panic selling occurs, and quarantine tickets increase.
-            # When prices rise, people hold back (quarantine tickets slightly down), then catch up.
-            trade_intensity = 1.0
-            price_change = 0.0
-            # Look up previous spot price
-            if count > 0:
-                prev_price = spots[count-1].price
-                price_change = price - prev_price
-                
-            if price_change < -0.2: # sharp drop -> panic selling
-                trade_intensity = 1.25
-            elif price_change > 0.2: # sharp rise -> holding back
-                trade_intensity = 0.85
-                
-            quar_certs = int(8000 * trade_intensity * random.uniform(0.9, 1.1))
-            
-            # 2. Freight Index: base 1000. Correlates with trade intensity
-            freight = round(1000.0 * (0.85 + (trade_intensity - 1.0) * 0.5) * random.uniform(0.95, 1.05), 1)
-            
-            # 3. Mortality Waste Disposal (病死猪无害化处理量): base 500吨.
-            # Rises dramatically if epidemic sentiment is high.
-            epidemic_factor = 1.0
-            asf_score = 0.0
-            ped_score = 0.0
-            if dt in sentiment_map:
-                for s in sentiment_map[dt]:
-                    if s.keyword in ["非瘟", "小飞"]:
-                        asf_score = max(asf_score, s.sentiment_score)
-                    elif s.keyword in ["腹泻"]:
-                        ped_score = max(ped_score, s.sentiment_score)
-            
-            # If sentiment scores are high, disease outbreak -> more dead pigs
-            if asf_score > 25.0 or ped_score > 35.0:
-                epidemic_factor = 1.0 + (max(asf_score, ped_score) / 50.0) # up to 2.5x
-                
-            mortality = round(500.0 * epidemic_factor * random.uniform(0.92, 1.08), 2)
-
-            existing = db.query(HogLogisticsAndSafety).filter(HogLogisticsAndSafety.date == dt).first()
-            logistics_record = {
-                "date": dt,
-                "quarantine_certificates": quar_certs,
-                "transport_freight_index": freight,
-                "mortality_waste_disposal": mortality
-            }
-            if existing:
-                for k, v in logistics_record.items():
-                    setattr(existing, k, v)
-            else:
-                db.add(HogLogisticsAndSafety(**logistics_record))
-            count += 1
-            if count % 200 == 0:
-                db.commit()
-        db.commit()
-        print(f"Synced {count} logistics & safety records.")
-    except Exception as e:
-        print("Error simulating logistics & safety data:", e)
-        if db:
-            db.rollback()
-    finally:
-        if should_close:
-            db.close()
-
+    pass
 
 def fetch_company_monthly_sales(db: Session = None):
-    """
-    Scrape/simulate listed companies' monthly reports (生猪销售简报) for Muyuan, Wens, and New Hope.
-    """
-    should_close = False
-    if db is None:
-        db = SessionLocal()
-        should_close = True
+    pass
 
-    try:
-        from .models import CompanyMonthlySales
-        import datetime
-        import random
-
-        print(">>> [Corporate Reports Scraper] Fetching listed companies' monthly sales reports...")
-        print(">>> [Corporate Reports Scraper] Scraping 牧原股份 (002714) monthly sales releases from SZSE...")
-        print(">>> [Corporate Reports Scraper] Scraping 温氏股份 (300498) monthly sales releases...")
-        print(">>> [Corporate Reports Scraper] Scraping 新希望 (000876) monthly sales releases...")
-
-        companies = [
-            {"symbol": "002714", "name": "牧原股份", "base_volume": 500.0, "price_drift": 0.0},
-            {"symbol": "300498", "name": "温氏股份", "base_volume": 210.0, "price_drift": -0.2},
-            {"symbol": "000876", "name": "新希望", "base_volume": 140.0, "price_drift": -0.1}
-        ]
-
-        # Generate data for past months: Jan 2025 to May 2026
-        start_year, start_month = 2025, 1
-        end_year, end_month = 2026, 5
-
-        current_yr = start_year
-        current_mo = start_month
-        count = 0
-
-        while True:
-            # Calculate end of month date
-            if current_mo == 12:
-                month_end_date = datetime.date(current_yr, 12, 31)
-            else:
-                month_end_date = datetime.date(current_yr, current_mo + 1, 1) - datetime.timedelta(days=1)
-
-            # Query the average spot price on that month end to make corporate sales price realistic
-            spot = db.query(SpotPrice).filter(SpotPrice.date <= month_end_date).order_by(SpotPrice.date.desc()).first()
-            base_spot_price = spot.price if spot else 15.0
-
-            for comp in companies:
-                random.seed(int(month_end_date.strftime("%Y%m%d")) + int(comp["symbol"]))
-                
-                # Seasonality factor for sales volume (Jan/Feb combined or high, summer slightly lower)
-                season_factor = 1.0
-                if current_mo in [1, 2]:
-                    season_factor = 1.15
-                elif current_mo in [7, 8]:
-                    season_factor = 0.9
-
-                # Growth factor over time (companies expanded capacity in 2025)
-                months_passed = (current_yr - 2025) * 12 + (current_mo - 1)
-                growth_factor = 1.0 + (months_passed * 0.008)
-
-                sales_vol = round(comp["base_volume"] * season_factor * growth_factor * random.uniform(0.92, 1.08), 2)
-                # Price is highly correlated with national spot price
-                sales_pr = round(base_spot_price + comp["price_drift"] + random.uniform(-0.15, 0.15), 2)
-                # Revenue: sales_vol (万头) * average weight (~120kg) * sales_pr (元/公斤) = Revenue (万元)
-                sales_rev = round(sales_vol * 120.0 * sales_pr, 2)
-
-                existing = db.query(CompanyMonthlySales).filter(
-                    CompanyMonthlySales.symbol == comp["symbol"],
-                    CompanyMonthlySales.date == month_end_date
-                ).first()
-
-                sales_record = {
-                    "symbol": comp["symbol"],
-                    "name": comp["name"],
-                    "date": month_end_date,
-                    "sales_volume": sales_vol,
-                    "sales_price": sales_pr,
-                    "sales_revenue": sales_rev
-                }
-
-                if existing:
-                    for k, v in sales_record.items():
-                        setattr(existing, k, v)
-                else:
-                    db.add(CompanyMonthlySales(**sales_record))
-                count += 1
-
-            if current_yr == end_year and current_mo == end_month:
-                break
-
-            if current_mo == 12:
-                current_yr += 1
-                current_mo = 1
-            else:
-                current_mo += 1
-
-        db.commit()
-        print(f">>> [Corporate Reports Scraper] Synced {count} monthly sales reports for 牧原, 温氏, 新希望.")
-    except Exception as e:
-        print("Error in fetch_company_monthly_sales:", e)
-        if db:
-            db.rollback()
-    finally:
-        if should_close:
-            db.close()
+def fetch_downstream_demand(db: Session = None):
+    pass
 
 
 

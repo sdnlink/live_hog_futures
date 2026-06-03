@@ -240,4 +240,18 @@ class CompanyMonthlySales(Base):
     )
 
 
+class PorkDownstreamDemand(Base):
+    """猪肉下游实际需求及产销监控表"""
+    __tablename__ = "pork_downstream_demand"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    pork_production = Column(Float, nullable=True)               # 猪肉实际生产量 (万吨)
+    pork_consumption = Column(Float, nullable=True)              # 猪肉实际消费量 (万吨)
+    feed_supply = Column(Float, nullable=True)                   # 饲料实际供给量 (万吨)
+    processed_pork_demand = Column(Float, nullable=True)         # 猪肉深加工制品需求量 (万吨)
+    catering_pork_demand = Column(Float, nullable=True)          # 餐饮与商用肉类需求量 (万吨)
+
+
+
 

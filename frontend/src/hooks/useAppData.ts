@@ -13,11 +13,6 @@ import type {
   YijingForecast,
   StockKline,
   StockQuote,
-  FrozenPorkStorage,
-  BiopharmaceuticalProcurement,
-  BreedingConsumable,
-  FeedSalesBreakdown,
-  HogLogisticsSafety,
   CompanyMonthlySales,
   AnalysisReportResponse
 } from '../types';
@@ -44,11 +39,6 @@ export const useAppData = (selectedSymbol: string) => {
   
   const [stockData, setStockData] = useState<StockKline[]>([]);
   const [stockQuotes, setStockQuotes] = useState<StockQuote[]>([]);
-  const [frozenPorkData, setFrozenPorkData] = useState<FrozenPorkStorage[]>([]);
-  const [biopharmData, setBiopharmData] = useState<BiopharmaceuticalProcurement[]>([]);
-  const [consumablesData, setConsumablesData] = useState<BreedingConsumable[]>([]);
-  const [feedBreakdownData, setFeedBreakdownData] = useState<FeedSalesBreakdown[]>([]);
-  const [logisticsSafetyData, setLogisticsSafetyData] = useState<HogLogisticsSafety[]>([]);
   const [companySalesData, setCompanySalesData] = useState<CompanyMonthlySales[]>([]);
 
   // Status States
@@ -70,7 +60,7 @@ export const useAppData = (selectedSymbol: string) => {
   const fetchStaticData = useCallback(async () => {
     try {
       setErrorMsg('');
-      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, frozenRes, biopharmRes, consumablesRes, feedRes, logisticsRes, companySalesRes] = await Promise.all([
+      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, companySalesRes] = await Promise.all([
         fetch(`${BASE_URL}/api/spot/basis`),
         fetch(`${BASE_URL}/api/spot/provincial`),
         fetch(`${BASE_URL}/api/fundamentals/capacity?granularity=monthly`),
@@ -80,15 +70,10 @@ export const useAppData = (selectedSymbol: string) => {
         fetch(`${BASE_URL}/api/epidemic/status`),
         fetch(`${BASE_URL}/api/spot/pork`),
         fetch(`${BASE_URL}/api/stocks/trends`),
-        fetch(`${BASE_URL}/api/fundamentals/frozen_pork`),
-        fetch(`${BASE_URL}/api/fundamentals/biopharm`),
-        fetch(`${BASE_URL}/api/fundamentals/consumables`),
-        fetch(`${BASE_URL}/api/fundamentals/feed_breakdown`),
-        fetch(`${BASE_URL}/api/fundamentals/logistics_safety`),
         fetch(`${BASE_URL}/api/fundamentals/company_sales`),
       ]);
 
-      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !frozenRes.ok || !biopharmRes.ok || !consumablesRes.ok || !feedRes.ok || !logisticsRes.ok || !companySalesRes.ok) {
+      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !companySalesRes.ok) {
         throw new Error('Failed to retrieve macro fundamental data from backend.');
       }
 
@@ -103,11 +88,6 @@ export const useAppData = (selectedSymbol: string) => {
       setSentimentIndex(epidemicStatus.sentiment);
       setPorkPriceData(await porkRes.json());
       setStockData(await stockRes.json());
-      setFrozenPorkData(await frozenRes.json());
-      setBiopharmData(await biopharmRes.json());
-      setConsumablesData(await consumablesRes.json());
-      setFeedBreakdownData(await feedRes.json());
-      setLogisticsSafetyData(await logisticsRes.json());
       setCompanySalesData(await companySalesRes.json());
     } catch (err: any) {
       console.error(err);
@@ -254,11 +234,6 @@ export const useAppData = (selectedSymbol: string) => {
     yijingForecast,
     stockData,
     stockQuotes,
-    frozenPorkData,
-    biopharmData,
-    consumablesData,
-    feedBreakdownData,
-    logisticsSafetyData,
     companySalesData,
     analysisReportData,
     isLoading,

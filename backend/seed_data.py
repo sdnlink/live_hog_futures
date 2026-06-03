@@ -12,7 +12,7 @@ from backend.scraper import (
     fetch_sentiment_radar, LH_CONTRACTS, fetch_pork_prices,
     fetch_stock_klines, fetch_live_stocks, fetch_frozen_pork_storage,
     fetch_biopharm_data, fetch_consumables_data, fetch_feed_breakdown, fetch_logistics_safety,
-    fetch_company_monthly_sales
+    fetch_company_monthly_sales, fetch_downstream_demand
 )
 
 def run_seeding():
@@ -52,9 +52,9 @@ def run_seeding():
     print("\n7. Seeding epidemic reports...")
     fetch_epidemic_reports(db)
     
-    # 8. Sentiment Indices
-    print("\n8. Seeding news sentiment radar...")
-    fetch_sentiment_radar(db)
+    # 8. Sentiment Indices (Disabled - no real API)
+    # print("\n8. Seeding news sentiment radar...")
+    # fetch_sentiment_radar(db)
     
     # 9. Stock historical trends
     print("\n9. Fetching historical A-share stock prices for listed hog companies...")
@@ -64,23 +64,25 @@ def run_seeding():
     print("\n10. Fetching real-time stock quotes...")
     fetch_live_stocks(db)
 
-    # 10b. Fetching listed companies monthly sales data...
-    print("\n10b. Fetching listed companies monthly sales data...")
-    fetch_company_monthly_sales(db)
+    # 10b. Fetching listed companies monthly sales data... (Disabled - no real API)
+    # print("\n10b. Fetching listed companies monthly sales data...")
+    # fetch_company_monthly_sales(db)
 
     # 11. Frozen pork storage data
     print("\n11. Fetching frozen pork reserves and storage capacity...")
     fetch_frozen_pork_storage(db)
     
-    # 12. Upstream supplies & alternative indicators
-    print("\n12. Seeding biopharmaceutical procurement data...")
-    fetch_biopharm_data(db)
-    print("\n13. Seeding breeding consumables data...")
-    fetch_consumables_data(db)
-    print("\n14. Seeding feed sales breakdown data...")
-    fetch_feed_breakdown(db)
-    print("\n15. Seeding logistics & health safety data...")
-    fetch_logistics_safety(db)
+    # 12. Upstream supplies & alternative indicators (Disabled - no real API)
+    # print("\n12. Seeding biopharmaceutical procurement data...")
+    # fetch_biopharm_data(db)
+    # print("\n13. Seeding breeding consumables data...")
+    # fetch_consumables_data(db)
+    # print("\n14. Seeding feed sales breakdown data...")
+    # fetch_feed_breakdown(db)
+    # print("\n15. Seeding logistics & health safety data...")
+    # fetch_logistics_safety(db)
+    # print("\n16. Seeding pork downstream demand monitoring data...")
+    # fetch_downstream_demand(db)
     
     print("\n=================== Seeding Completed Successfully! ===================")
     db.close()

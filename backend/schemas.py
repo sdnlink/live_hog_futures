@@ -351,6 +351,20 @@ class AnalysisReportResponse(BaseModel):
     narrative: str
 
 
+class PorkDownstreamDemandOut(BaseModel):
+    id: int
+    date: date
+    pork_production: Optional[float] = None
+    pork_consumption: Optional[float] = None
+    feed_supply: Optional[float] = None
+    processed_pork_demand: Optional[float] = None
+    catering_pork_demand: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+
 
 
 

@@ -314,5 +314,12 @@ export interface AnalysisReportResponse {
   narrative: string;
 }
 
-
-
+export interface PorkDownstreamDemand {
+  id: number;
+  date: string;
+  pork_production: number | null;
+  pork_consumption: number | null;
+  feed_supply: number | null;
+  processed_pork_demand: number | null;
+  catering_pork_demand: number | null;
+}

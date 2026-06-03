@@ -117,7 +117,8 @@ def test_expert_advice_epidemic_scenario():
     mock_biopharm = BiopharmaceuticalProcurement(date=today, altrenogest_sales=90.0)
     mock_consumables = BreedingConsumableConsumption(date=today, insemination_catheters=260.0)
     mock_feed = FeedSalesBreakdown(date=today, finisher_feed=40.0, overall_feed_volume=100.0) # finisher ratio = 40% (normal)
-    mock_logistics = HogLogisticsAndSafety(date=today, mortality_waste_disposal=850.0) # High mortality (850 > 500 * 1.3)
+    mock_logistics = HogLogisticsAndSafety(date=today, mortality_waste_disposal=850.0)
+    mock_epidemic = [EpidemicReport(date=today, title="非瘟警报", level="danger", source="农业农村部")] # High mortality (850 > 500 * 1.3)
     
     def side_effect(model_class):
         if model_class is SpotPrice:
@@ -138,6 +139,8 @@ def test_expert_advice_epidemic_scenario():
             return MockQuery(FeedSalesBreakdown, mock_feed)
         elif model_class is HogLogisticsAndSafety:
             return MockQuery(HogLogisticsAndSafety, mock_logistics)
+        elif model_class is EpidemicReport:
+            return MockQuery(EpidemicReport, mock_epidemic)
         return MockQuery(model_class)
 
     mock_db.query.side_effect = side_effect

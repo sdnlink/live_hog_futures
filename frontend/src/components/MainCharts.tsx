@@ -12,13 +12,10 @@ import {
   Tooltip,
   Legend,
   ReferenceLine,
-  ReferenceArea,
   LineChart
 } from 'recharts';
 import type {
-  FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator, FrozenPorkStorage,
-  BiopharmaceuticalProcurement, BreedingConsumable, FeedSalesBreakdown, HogLogisticsSafety,
-  CompanyMonthlySales
+  FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator, CompanyMonthlySales
 } from '../types';
 
 interface MainChartsProps {
@@ -30,11 +27,6 @@ interface MainChartsProps {
   capacityData: SwineCapacity[];
   weeklyCapacityData: SwineCapacity[];
   dailyCapacityData: SwineCapacity[];
-  frozenPorkData: FrozenPorkStorage[];
-  biopharmData: BiopharmaceuticalProcurement[];
-  consumablesData: BreedingConsumable[];
-  feedBreakdownData: FeedSalesBreakdown[];
-  logisticsSafetyData: HogLogisticsSafety[];
   companySalesData: CompanyMonthlySales[];
   selectedSymbol: string;
   filterByTimeRange: <T extends { date: string }>(data: T[]) => T[];
@@ -42,24 +34,10 @@ interface MainChartsProps {
 
 const CustomChartTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const isFuture = label && label > '2026-06-02';
     return (
       <div className="custom-tooltip">
         <p style={{ fontWeight: 600, marginBottom: '6px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span>{label}</span>
-          {isFuture && (
-            <span style={{ 
-              fontSize: '0.65rem', 
-              background: 'rgba(251, 191, 36, 0.2)', 
-              border: '1px solid rgba(251, 191, 36, 0.5)', 
-              color: '#fbbf24', 
-              padding: '1px 4px', 
-              borderRadius: '3px',
-              fontWeight: 700
-            }}>
-              预测估算值
-            </span>
-          )}
         </p>
         {payload.map((item: any, idx: number) => (
           <p key={idx} style={{ color: item.color || item.stroke, fontSize: '0.8rem', margin: '2px 0' }}>
@@ -67,25 +45,6 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
           </p>
         ))}
       </div>
-    );
-  }
-  return null;
-};
-
-const renderForecastArea = (dataList: any[], yAxisId?: string) => {
-  if (!dataList || dataList.length === 0) return null;
-  const lastDate = dataList[dataList.length - 1].date;
-  if (lastDate > '2026-06-02') {
-    return (
-      <ReferenceArea
-        yAxisId={yAxisId}
-        x1="2026-06-02"
-        x2={lastDate}
-        fill="rgba(251, 191, 36, 0.07)"
-        stroke="rgba(251, 191, 36, 0.15)"
-        strokeDasharray="3 3"
-        label={{ value: '预测估算区间', fill: '#fbbf24', fontSize: 9, position: 'insideTopLeft', offset: 10 }}
-      />
     );
   }
   return null;
@@ -100,11 +59,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
   capacityData,
   weeklyCapacityData,
   dailyCapacityData,
-  frozenPorkData,
-  biopharmData,
-  consumablesData,
-  feedBreakdownData,
-  logisticsSafetyData,
   companySalesData,
   selectedSymbol,
   filterByTimeRange
@@ -215,47 +169,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
     return filteredCapacityData.filter(d => d.average_market_weight !== null && d.average_market_weight !== undefined);
   }, [filteredCapacityData]);
 
-  // 5. Memoize frozen pork data
-  const filteredFrozenPorkData = React.useMemo(() => {
-    return filterByTimeRange(frozenPorkData);
-  }, [frozenPorkData, filterByTimeRange]);
-
-  const filteredBiopharmData = React.useMemo(() => {
-    let activeData = filterByTimeRange(biopharmData || []);
-    if (activeData.length > 150) {
-      const step = Math.ceil(activeData.length / 150);
-      activeData = activeData.filter((_, idx) => idx % step === 0);
-    }
-    return activeData;
-  }, [biopharmData, filterByTimeRange]);
-
-  const filteredConsumablesData = React.useMemo(() => {
-    let activeData = filterByTimeRange(consumablesData || []);
-    if (activeData.length > 150) {
-      const step = Math.ceil(activeData.length / 150);
-      activeData = activeData.filter((_, idx) => idx % step === 0);
-    }
-    return activeData;
-  }, [consumablesData, filterByTimeRange]);
-
-  const filteredFeedData = React.useMemo(() => {
-    let activeData = filterByTimeRange(feedBreakdownData || []);
-    if (activeData.length > 150) {
-      const step = Math.ceil(activeData.length / 150);
-      activeData = activeData.filter((_, idx) => idx % step === 0);
-    }
-    return activeData;
-  }, [feedBreakdownData, filterByTimeRange]);
-
-  const filteredLogisticsData = React.useMemo(() => {
-    let activeData = filterByTimeRange(logisticsSafetyData || []);
-    if (activeData.length > 150) {
-      const step = Math.ceil(activeData.length / 150);
-      activeData = activeData.filter((_, idx) => idx % step === 0);
-    }
-    return activeData;
-  }, [logisticsSafetyData, filterByTimeRange]);
-
   const companyCrossValidationData = React.useMemo(() => {
     if (!companySalesData || !companySalesData.length) return [];
     
@@ -308,8 +221,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <YAxis stroke="var(--text-muted)" domain={['dataMin - 1', 'dataMax + 1']} fontSize={11} unit="元" />
           <Tooltip content={<CustomChartTooltip />} />
           <Legend verticalAlign="top" height={36} />
-          {renderForecastArea(filteredSpotFuturesData)}
-          <ReferenceLine x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
           <Line name="现货均价 (全国)" type="monotone" dataKey="spotPrice" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
           <Line name={`期货价 (${selectedSymbol} 折合)`} type="monotone" dataKey="futuresPrice" stroke="var(--color-accent)" strokeWidth={2} dot={false} strokeDasharray="4 4" connectNulls />
           <Line name="猪肉批发价 (消费端)" type="monotone" dataKey="porkPrice" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
@@ -339,8 +250,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <YAxis stroke="var(--text-muted)" fontSize={11} unit="元" />
           <Tooltip content={<CustomChartTooltip />} />
           <Legend verticalAlign="top" height={36} />
-          {renderForecastArea(filteredBasisData)}
-          <ReferenceLine x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
           <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
           <Area name="基差水平 (现货-期货)" type="monotone" dataKey="basis" stroke="var(--color-warn)" fillOpacity={1} fill="url(#colorBasis)" strokeWidth={1.5} />
         </AreaChart>
@@ -361,8 +270,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
           <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" label={{ value: '猪粮比价', angle: 90, position: 'insideRight', fill: 'var(--text-muted)' }} fontSize={11} />
           <Tooltip content={<CustomChartTooltip />} />
           <Legend verticalAlign="top" height={36} />
-          {renderForecastArea(filteredCostsData, "left")}
-          <ReferenceLine yAxisId="left" x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
           <Line yAxisId="left" name="自繁自养利润" type="monotone" dataKey="self_breeding_profit" stroke="var(--color-up)" strokeWidth={2} dot={false} />
           <Line yAxisId="left" name="外购仔猪利润" type="monotone" dataKey="piglet_breeding_profit" stroke="var(--color-accent)" strokeWidth={1.5} dot={false} />
           <Line yAxisId="right" name="猪粮比价" type="monotone" dataKey="pig_to_grain_ratio" stroke="var(--color-warn)" strokeWidth={2} dot={false} />
@@ -425,8 +332,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
                 <YAxis yAxisId="right-rate" orientation="right" stroke="var(--text-muted)" domain={[0, 100]} fontSize={10} hide={true} />
                 <Tooltip content={<CustomChartTooltip />} />
                 <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredCapacityData, "left")}
-                <ReferenceLine yAxisId="left" x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
                 <Line yAxisId="left" name="能繁母猪存栏" type="monotone" dataKey="maternal_sow_inventory" stroke="var(--color-accent)" strokeWidth={2.5} dot={false} connectNulls />
                 <Line yAxisId="left" name={granularity === 'daily' ? "定点屠宰量 (日度)" : granularity === 'weekly' ? "定点屠宰量 (周度)" : "定点屠宰量 (月度)"} type="monotone" dataKey="slaughterhouse_volume" stroke="rgb(233, 30, 99)" strokeWidth={2.5} dot={false} connectNulls />
                 <Line yAxisId="right-inventory" name="生猪存栏" type="monotone" dataKey="hog_inventory" stroke="rgb(103, 58, 183)" strokeWidth={2.5} dot={false} connectNulls />
@@ -452,8 +357,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
                 <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: granularity === 'daily' ? '日度出栏量 (万头)' : granularity === 'weekly' ? '周度出栏量 (万头)' : '月度出栏量 (万头)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
                 <Tooltip content={<CustomChartTooltip />} />
                 <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredCapacityData, "left")}
-                <ReferenceLine yAxisId="left" x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
                 <Line yAxisId="left" name={granularity === 'daily' ? "猪肉产量 (供给, 日度)" : granularity === 'weekly' ? "猪肉产量 (供给, 周度)" : "猪肉产量 (供给, 月度)"} type="monotone" dataKey="pork_production" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
                 <Line yAxisId="left" name={granularity === 'daily' ? "猪肉消费量 (消费, 日度)" : granularity === 'weekly' ? "猪肉消费量 (消费, 周度)" : "猪肉消费量 (消费, 月度)"} type="monotone" dataKey="pork_consumption" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
                 <Line yAxisId="right" name={granularity === 'daily' ? "生猪出栏量 (日度)" : granularity === 'weekly' ? "生猪出栏量 (周度)" : "生猪出栏量 (月度)"} type="monotone" dataKey="hog_slaughter" stroke="rgb(0, 188, 212)" strokeWidth={2} dot={false} strokeDasharray="5 3" connectNulls />
@@ -477,8 +380,6 @@ const MainCharts: React.FC<MainChartsProps> = ({
                 <YAxis stroke="var(--text-muted)" domain={['dataMin - 5', 'dataMax + 5']} fontSize={10} label={{ value: '估算出栏均重 (公斤/头)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
                 <Tooltip content={<CustomChartTooltip />} />
                 <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(weightData)}
-                <ReferenceLine x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
                 <Line name="出栏均重 (公斤/头)" type="monotone" dataKey="average_market_weight" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
               </LineChart>
             </ResponsiveContainer>
@@ -512,188 +413,7 @@ const MainCharts: React.FC<MainChartsProps> = ({
     );
   }
 
-  if (activeChartTab === 'frozen-pork') {
-    return (
-      <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            中央储备冻品投放与商业库存走势
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={filteredFrozenPorkData}
-                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis stroke="var(--text-muted)" fontSize={10} label={{ value: '冻品数量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <Tooltip content={<CustomChartTooltip />} />
-                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredFrozenPorkData)}
-                <ReferenceLine x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
-                <Line name="商业冻猪肉库存" type="monotone" dataKey="commercial_inventory" stroke="var(--color-accent)" strokeWidth={2.5} dot={false} connectNulls />
-                <Bar name="储备冻肉投放/收储量" dataKey="reserve_volume" fill="var(--color-down)" radius={[4, 4, 0, 0]} maxBarSize={15} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            全国商业冻品库容率趋势
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={filteredFrozenPorkData}
-                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
-              >
-                <defs>
-                  <linearGradient id="colorStorageRate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-warn)" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="var(--color-warn)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis stroke="var(--text-muted)" domain={[0, 100]} fontSize={10} label={{ value: '库容率 (%)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <Tooltip content={<CustomChartTooltip />} />
-                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredFrozenPorkData)}
-                <ReferenceLine x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
-                <Area name="商业冻品库容率" type="monotone" dataKey="storage_rate" stroke="var(--color-warn)" fillOpacity={1} fill="url(#colorStorageRate)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (activeChartTab === 'upstream-supplies') {
-    return (
-      <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            生猪生物医药与疫苗采购趋势
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={filteredBiopharmData}
-                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '疫苗采购 (万支)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '激素销售与景气指数', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <Tooltip content={<CustomChartTooltip />} />
-                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredBiopharmData, "left")}
-                <ReferenceLine yAxisId="left" x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
-                <Bar yAxisId="left" name="猪瘟疫苗" dataKey="swine_fever_vaccine" fill="var(--color-accent)" stackId="a" opacity={0.65} maxBarSize={12} />
-                <Bar yAxisId="left" name="蓝耳疫苗" dataKey="prrs_vaccine" fill="var(--color-up)" stackId="a" opacity={0.65} maxBarSize={12} />
-                <Bar yAxisId="left" name="口蹄疫疫苗" dataKey="fmd_vaccine" fill="var(--color-warn)" stackId="a" opacity={0.65} maxBarSize={12} />
-                <Line yAxisId="right" name="烯丙孕素 (后备用)" type="monotone" dataKey="altrenogest_sales" stroke="rgb(233, 30, 99)" strokeWidth={2} dot={false} connectNulls />
-                <Line yAxisId="right" name="缩宫素 (催产用)" type="monotone" dataKey="oxytocin_sales" stroke="rgb(0, 188, 212)" strokeWidth={2} dot={false} connectNulls />
-                <Line yAxisId="right" name="动保景气指数" type="monotone" dataKey="vaccine_index" stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            母猪配种耗材与产房物资消耗走势
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={filteredConsumablesData}
-                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '配种耗材 (万支/万袋)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '产房/耳标物料 (万包/万支/万枚)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <Tooltip content={<CustomChartTooltip />} />
-                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredConsumablesData, "left")}
-                <ReferenceLine yAxisId="left" x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
-                <Bar yAxisId="left" name="人工授精输精管" dataKey="insemination_catheters" fill="var(--color-accent)" opacity={0.7} maxBarSize={15} />
-                <Line yAxisId="left" name="精液稀释粉/液" type="monotone" dataKey="semen_extender" stroke="rgb(139, 195, 74)" strokeWidth={2} dot={false} connectNulls />
-                <Line yAxisId="right" name="仔猪干燥接生粉" type="monotone" dataKey="farrowing_dry_powder" stroke="var(--color-warn)" strokeWidth={2} dot={false} connectNulls />
-                <Line yAxisId="right" name="仔猪补铁针" type="monotone" dataKey="iron_injection" stroke="var(--color-up)" strokeWidth={2} dot={false} connectNulls />
-                <Line yAxisId="right" name="建档出栏耳标" type="monotone" dataKey="ear_tags" stroke="rgb(156, 39, 176)" strokeWidth={2} dot={false} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (activeChartTab === 'logistics-feed') {
-    return (
-      <div className="capacity-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            饲料细分销量结构走势 (验证存栏结构)
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={filteredFeedData}
-                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '细分饲料销量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '饲料总销量 (万吨)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <Tooltip content={<CustomChartTooltip />} />
-                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredFeedData, "left")}
-                <ReferenceLine yAxisId="left" x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
-                <Bar yAxisId="left" name="母猪料" dataKey="sow_feed" fill="rgb(233, 30, 99)" stackId="feed" opacity={0.6} maxBarSize={15} />
-                <Bar yAxisId="left" name="教槽/乳猪料" dataKey="piglet_feed" fill="rgb(0, 188, 212)" stackId="feed" opacity={0.6} maxBarSize={15} />
-                <Bar yAxisId="left" name="保育/中猪料" dataKey="grower_feed" fill="var(--color-accent)" stackId="feed" opacity={0.6} maxBarSize={15} />
-                <Bar yAxisId="left" name="肥猪配合料" dataKey="finisher_feed" fill="var(--color-warn)" stackId="feed" opacity={0.6} maxBarSize={15} />
-                <Line yAxisId="right" name="饲料总销售量" type="monotone" dataKey="overall_feed_volume" stroke="var(--color-up)" strokeWidth={2.5} dot={false} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
-            生猪物流调运、运力价格与无害化处理量
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={filteredLogisticsData}
-                margin={{ top: 10, right: 10, bottom: 5, left: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
-                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '跨省检疫票 (张) / 运费指数', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '病死猪无害化处理量 (吨)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
-                <Tooltip content={<CustomChartTooltip />} />
-                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
-                {renderForecastArea(filteredLogisticsData, "left")}
-                <ReferenceLine yAxisId="left" x="2026-06-02" stroke="rgba(251, 191, 36, 0.7)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '今日/预测分界线', fill: '#fbbf24', fontSize: 10, position: 'top' }} />
-                <Bar yAxisId="left" name="生猪跨省检疫票张数" dataKey="quarantine_certificates" fill="var(--color-accent)" opacity={0.65} maxBarSize={15} />
-                <Line yAxisId="left" name="跨省调运车运费指数" type="monotone" dataKey="transport_freight_index" stroke="var(--color-warn)" strokeWidth={2.5} dot={false} connectNulls />
-                <Line yAxisId="right" name="无害化处理死亡量" type="monotone" dataKey="mortality_waste_disposal" stroke="var(--color-down)" strokeWidth={2.5} dot={false} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return null;
-};
+}
 
 export default MainCharts;

@@ -1,14 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Map, FileText, TrendingUp as StockIcon } from 'lucide-react';
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, LineChart, Line, Legend } from 'recharts';
-import type { ProvincialPrice, EpidemicReport, SentimentIndex, StockKline, StockQuote } from '../types';
+import type { ProvincialPrice, EpidemicReport, StockKline, StockQuote } from '../types';
 import StockTable from './StockTable';
 import AutoScrollFeed from './AutoScrollFeed';
 
 interface BottomDashboardProps {
   provPrices: ProvincialPrice[];
   epidemicReports: EpidemicReport[];
-  sentimentIndex: SentimentIndex[];
   stockData: StockKline[];
   stockQuotes: StockQuote[];
   isFullPage?: boolean;
@@ -30,7 +29,7 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicReports, sentimentIndex, stockData, stockQuotes, isFullPage = false }) => {
+const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicReports, stockData, stockQuotes, isFullPage = false }) => {
   const [stockTimeRange, setStockTimeRange] = useState<'30d' | '90d' | '180d' | '365d' | 'all'>('365d');
   const sortedProvPrices = useMemo(() => {
     return [...provPrices].sort((a, b) => b.price - a.price);
@@ -191,17 +190,17 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
             </div>
           </article>
 
-          {/* Column 2: Epidemic Alerts & Sentiment Index */}
+          {/* Column 2: Epidemic Alerts & Warnings */}
           <article className="glass-panel" style={{ padding: '16px' }}>
             <div className="panel-title-bar">
               <div className="panel-title">
                 <FileText size={18} />
-                <span>官方疫情通报与舆情监控</span>
+                <span>官方动物疫病通报与预警</span>
               </div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Disease alerts</span>
             </div>
 
-            <AutoScrollFeed className="epidemic-feed" style={{ maxHeight: '220px' }}>
+            <AutoScrollFeed className="epidemic-feed" style={{ maxHeight: '360px' }}>
               {epidemicReports.map((report, idx) => (
                 <a 
                   key={idx} 
@@ -228,41 +227,6 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
                 </a>
               ))}
             </AutoScrollFeed>
-
-            <div className="sentiment-grid">
-              {sentimentIndex.map((item, idx) => {
-                const isHigh = item.sentiment_score > 50;
-                const isMedium = item.sentiment_score > 25 && item.sentiment_score <= 50;
-                const scoreClass = isHigh ? 'high' : isMedium ? 'medium' : 'low';
-
-                const isDouyin = item.keyword.includes("抖音");
-                const isToutiao = item.keyword.includes("头条");
-                const isForum = item.keyword.includes("论坛");
-                
-                let customBadgeStyle = {};
-                let customKwStyle = {};
-                if (isDouyin) {
-                  customBadgeStyle = { background: 'rgba(236, 72, 153, 0.1)', borderColor: 'rgba(236, 72, 153, 0.4)' };
-                  customKwStyle = { color: '#f472b6', fontWeight: 600 };
-                } else if (isToutiao) {
-                  customBadgeStyle = { background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.4)' };
-                  customKwStyle = { color: '#f87171', fontWeight: 600 };
-                } else if (isForum) {
-                  customBadgeStyle = { background: 'rgba(14, 165, 233, 0.1)', borderColor: 'rgba(14, 165, 233, 0.4)' };
-                  customKwStyle = { color: '#38bdf8', fontWeight: 600 };
-                }
-
-                return (
-                  <div key={idx} className="sentiment-badge" style={customBadgeStyle}>
-                    <span className="sentiment-kw" style={customKwStyle}>{item.keyword}</span>
-                    <div style={{ textAlign: 'right' }}>
-                      <span className={`sentiment-score ${scoreClass} mono`}>{item.sentiment_score}%</span>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>热度频次: {item.frequency}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </article>
 
           {/* Column 3: Listed Hog Breeding Companies (StockTable) */}
@@ -308,17 +272,17 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
         </div>
       </article>
 
-      {/* Middle Column: Epidemic Alerts & Sentiment Index */}
+      {/* Middle Column: Epidemic Alerts & Warnings */}
       <article className="glass-panel" style={{ padding: '16px' }}>
         <div className="panel-title-bar">
           <div className="panel-title">
             <FileText size={18} />
-            <span>官方疫情通报与舆情监控</span>
+            <span>官方动物疫病通报与预警</span>
           </div>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Disease alerts</span>
         </div>
 
-        <AutoScrollFeed className="epidemic-feed" style={{ maxHeight: '240px' }}>
+        <AutoScrollFeed className="epidemic-feed" style={{ maxHeight: '340px' }}>
           {epidemicReports.map((report, idx) => (
             <a 
               key={idx} 
@@ -345,41 +309,6 @@ const BottomDashboard: React.FC<BottomDashboardProps> = ({ provPrices, epidemicR
             </a>
           ))}
         </AutoScrollFeed>
-
-        <div className="sentiment-grid">
-          {sentimentIndex.map((item, idx) => {
-            const isHigh = item.sentiment_score > 50;
-            const isMedium = item.sentiment_score > 25 && item.sentiment_score <= 50;
-            const scoreClass = isHigh ? 'high' : isMedium ? 'medium' : 'low';
-
-            const isDouyin = item.keyword.includes("抖音");
-            const isToutiao = item.keyword.includes("头条");
-            const isForum = item.keyword.includes("论坛");
-            
-            let customBadgeStyle = {};
-            let customKwStyle = {};
-            if (isDouyin) {
-              customBadgeStyle = { background: 'rgba(236, 72, 153, 0.1)', borderColor: 'rgba(236, 72, 153, 0.4)' };
-              customKwStyle = { color: '#f472b6', fontWeight: 600 };
-            } else if (isToutiao) {
-              customBadgeStyle = { background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.4)' };
-              customKwStyle = { color: '#f87171', fontWeight: 600 };
-            } else if (isForum) {
-              customBadgeStyle = { background: 'rgba(14, 165, 233, 0.1)', borderColor: 'rgba(14, 165, 233, 0.4)' };
-              customKwStyle = { color: '#38bdf8', fontWeight: 600 };
-            }
-
-            return (
-              <div key={idx} className="sentiment-badge" style={customBadgeStyle}>
-                <span className="sentiment-kw" style={customKwStyle}>{item.keyword}</span>
-                <div style={{ textAlign: 'right' }}>
-                  <span className={`sentiment-score ${scoreClass} mono`}>{item.sentiment_score}%</span>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>热度频次: {item.frequency}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </article>
 
       {/* Right Column: Hog Listed Companies Stock Price Trends */}
