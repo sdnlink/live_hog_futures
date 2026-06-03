@@ -11,7 +11,8 @@ from backend.scraper import (
     fetch_breeding_indicators, fetch_swine_capacity, fetch_epidemic_reports,
     fetch_sentiment_radar, LH_CONTRACTS, fetch_pork_prices,
     fetch_stock_klines, fetch_live_stocks, fetch_frozen_pork_storage,
-    fetch_biopharm_data, fetch_consumables_data, fetch_feed_breakdown, fetch_logistics_safety
+    fetch_biopharm_data, fetch_consumables_data, fetch_feed_breakdown, fetch_logistics_safety,
+    fetch_company_monthly_sales
 )
 
 def run_seeding():
@@ -62,6 +63,10 @@ def run_seeding():
     # 10. Stock real-time quotes
     print("\n10. Fetching real-time stock quotes...")
     fetch_live_stocks(db)
+
+    # 10b. Fetching listed companies monthly sales data...
+    print("\n10b. Fetching listed companies monthly sales data...")
+    fetch_company_monthly_sales(db)
 
     # 11. Frozen pork storage data
     print("\n11. Fetching frozen pork reserves and storage capacity...")

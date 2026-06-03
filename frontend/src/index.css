@@ -162,6 +162,10 @@ body {
   border-radius: 8px;
   cursor: pointer;
   transition: var(--transition-smooth);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tab-btn:hover {

@@ -276,3 +276,43 @@ export interface HogLogisticsSafety {
   mortality_waste_disposal: number | null;
 }
 
+export interface CompanyMonthlySales {
+  id: number;
+  symbol: string;
+  name: string;
+  date: string;
+  sales_volume: number | null;
+  sales_price: number | null;
+  sales_revenue: number | null;
+}
+
+export interface AnalysisSummary {
+  market_phase: string;
+  composite_index: number;
+  composite_status: string;
+  risk_level: string;
+  update_date: string;
+}
+
+export interface DimensionDetail {
+  score: number;
+  status: string;
+  desc: string;
+}
+
+export interface SwotAnalysis {
+  strengths: string[];
+  weaknesses: string[];
+  opportunities: string[];
+  threats: string[];
+}
+
+export interface AnalysisReportResponse {
+  summary: AnalysisSummary;
+  dimensions: Record<string, DimensionDetail>;
+  swot: SwotAnalysis;
+  narrative: string;
+}
+
+
+

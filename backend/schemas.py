@@ -220,3 +220,137 @@ class HogLogisticsAndSafetyOut(BaseModel):
         from_attributes = True
 
 
+class CompanyMonthlySalesOut(BaseModel):
+    id: int
+    symbol: str
+    name: str
+    date: date
+    sales_volume: Optional[float] = None
+    sales_price: Optional[float] = None
+    sales_revenue: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class EpidemicStatusOut(BaseModel):
+    reports: List[EpidemicReportOut]
+    sentiment: List[SentimentIndexOut]
+
+
+class MeihuaForecastOut(BaseModel):
+    ben_gua: str
+    bian_gua: str
+    hu_gua: str
+    upper: str
+    lower: str
+    upper_idx: int
+    lower_idx: int
+    bian_upper_idx: int
+    bian_lower_idx: int
+    hu_upper_idx: int
+    hu_lower_idx: int
+    dong_yao: int
+    ti_gua: str
+    yong_gua: str
+    ti_element: str
+    yong_element: str
+    sheng_ke: float
+    score: float
+
+
+class LiuyaoYaoRender(BaseModel):
+    pos: int
+    label: str
+    yang: bool
+    dong: bool
+
+
+class LiuyaoForecastOut(BaseModel):
+    ben_gua: str
+    bian_gua: str
+    upper: str
+    lower: str
+    upper_idx: int
+    lower_idx: int
+    bian_upper_idx: int
+    bian_lower_idx: int
+    yao_vals: List[int]
+    ben_lines: List[int]
+    dong_yao_list: List[int]
+    shi_yao: int
+    ying_yao: int
+    score: float
+    yao_render: List[LiuyaoYaoRender]
+
+
+class ForecastPointOut(BaseModel):
+    direction: str
+    direction_class: str
+    confidence: float
+    price: Optional[float] = None
+    mid: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+
+
+class ForecastTimelineOut(BaseModel):
+    realtime: ForecastPointOut
+    day1: ForecastPointOut
+    day5: ForecastPointOut
+    day10: ForecastPointOut
+
+
+class InterpretationOut(BaseModel):
+    meihua_summary: str
+    liuyao_summary: str
+    quant_bridge: str
+    conclusion: str
+
+
+class YijingForecastOut(BaseModel):
+    timestamp: str
+    spot_price: float
+    futures_price: float
+    meihua: MeihuaForecastOut
+    liuyao: LiuyaoForecastOut
+    quant_score: float
+    total_score: float
+    direction: str
+    direction_class: str
+    confidence: float
+    forecast: ForecastTimelineOut
+    interpretation: InterpretationOut
+
+
+class AnalysisSummaryOut(BaseModel):
+    market_phase: str
+    composite_index: float
+    composite_status: str
+    risk_level: str
+    update_date: str
+
+
+class DimensionDetailOut(BaseModel):
+    score: float
+    status: str
+    desc: str
+
+
+class SwotAnalysisOut(BaseModel):
+    strengths: List[str]
+    weaknesses: List[str]
+    opportunities: List[str]
+    threats: List[str]
+
+
+class AnalysisReportResponse(BaseModel):
+    summary: AnalysisSummaryOut
+    dimensions: Dict[str, DimensionDetailOut]
+    swot: SwotAnalysisOut
+    narrative: str
+
+
+
+
+

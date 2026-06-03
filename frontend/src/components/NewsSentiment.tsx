@@ -38,14 +38,31 @@ const NewsSentiment: React.FC<NewsSentimentProps> = ({ epidemicReports, sentimen
       </AutoScrollFeed>
 
       <div className="sentiment-grid" style={{ marginTop: '8px', gap: '4px' }}>
-        {sentimentIndex.slice(0, 4).map((item, idx) => {
+        {sentimentIndex.slice(0, 10).map((item, idx) => {
           const isHigh = item.sentiment_score > 50;
           const isMedium = item.sentiment_score > 25 && item.sentiment_score <= 50;
           const scoreClass = isHigh ? 'high' : isMedium ? 'medium' : 'low';
 
+          const isDouyin = item.keyword.includes("抖音");
+          const isToutiao = item.keyword.includes("头条");
+          const isForum = item.keyword.includes("论坛");
+          
+          let customBadgeStyle = {};
+          let customKwStyle = {};
+          if (isDouyin) {
+            customBadgeStyle = { background: 'rgba(236, 72, 153, 0.1)', borderColor: 'rgba(236, 72, 153, 0.4)' };
+            customKwStyle = { color: '#f472b6', fontWeight: 600 };
+          } else if (isToutiao) {
+            customBadgeStyle = { background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.4)' };
+            customKwStyle = { color: '#f87171', fontWeight: 600 };
+          } else if (isForum) {
+            customBadgeStyle = { background: 'rgba(14, 165, 233, 0.1)', borderColor: 'rgba(14, 165, 233, 0.4)' };
+            customKwStyle = { color: '#38bdf8', fontWeight: 600 };
+          }
+
           return (
-            <div key={idx} className="sentiment-badge" style={{ padding: '4px 8px' }}>
-              <span className="sentiment-kw" style={{ fontSize: '0.65rem' }}>{item.keyword}</span>
+            <div key={idx} className="sentiment-badge" style={{ padding: '4px 8px', ...customBadgeStyle }}>
+              <span className="sentiment-kw" style={{ fontSize: '0.65rem', ...customKwStyle }}>{item.keyword}</span>
               <span className={`sentiment-score ${scoreClass} mono`} style={{ fontSize: '0.7rem' }}>{item.sentiment_score}%</span>
             </div>
           );

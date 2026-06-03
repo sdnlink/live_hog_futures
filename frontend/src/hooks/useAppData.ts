@@ -17,7 +17,9 @@ import type {
   BiopharmaceuticalProcurement,
   BreedingConsumable,
   FeedSalesBreakdown,
-  HogLogisticsSafety
+  HogLogisticsSafety,
+  CompanyMonthlySales,
+  AnalysisReportResponse
 } from '../types';
 
 const BASE_URL = '/sys1';
@@ -38,6 +40,7 @@ export const useAppData = (selectedSymbol: string) => {
   const [sentimentIndex, setSentimentIndex] = useState<SentimentIndex[]>([]);
   const [expertAdvice, setExpertAdvice] = useState<ExpertAdvice | null>(null);
   const [yijingForecast, setYijingForecast] = useState<YijingForecast | null>(null);
+  const [analysisReportData, setAnalysisReportData] = useState<AnalysisReportResponse | null>(null);
   
   const [stockData, setStockData] = useState<StockKline[]>([]);
   const [stockQuotes, setStockQuotes] = useState<StockQuote[]>([]);
@@ -46,12 +49,14 @@ export const useAppData = (selectedSymbol: string) => {
   const [consumablesData, setConsumablesData] = useState<BreedingConsumable[]>([]);
   const [feedBreakdownData, setFeedBreakdownData] = useState<FeedSalesBreakdown[]>([]);
   const [logisticsSafetyData, setLogisticsSafetyData] = useState<HogLogisticsSafety[]>([]);
+  const [companySalesData, setCompanySalesData] = useState<CompanyMonthlySales[]>([]);
 
   // Status States
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRealtimePolling, setIsRealtimePolling] = useState<boolean>(false);
   const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
   const [isYijingLoading, setIsYijingLoading] = useState<boolean>(false);
+  const [isReportLoading, setIsReportLoading] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [nextRefreshSec, setNextRefreshSec] = useState<number>(0);
@@ -65,7 +70,7 @@ export const useAppData = (selectedSymbol: string) => {
   const fetchStaticData = useCallback(async () => {
     try {
       setErrorMsg('');
-      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, frozenRes, biopharmRes, consumablesRes, feedRes, logisticsRes] = await Promise.all([
+      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, frozenRes, biopharmRes, consumablesRes, feedRes, logisticsRes, companySalesRes] = await Promise.all([
         fetch(`${BASE_URL}/api/spot/basis`),
         fetch(`${BASE_URL}/api/spot/provincial`),
         fetch(`${BASE_URL}/api/fundamentals/capacity?granularity=monthly`),
@@ -80,9 +85,10 @@ export const useAppData = (selectedSymbol: string) => {
         fetch(`${BASE_URL}/api/fundamentals/consumables`),
         fetch(`${BASE_URL}/api/fundamentals/feed_breakdown`),
         fetch(`${BASE_URL}/api/fundamentals/logistics_safety`),
+        fetch(`${BASE_URL}/api/fundamentals/company_sales`),
       ]);
 
-      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !frozenRes.ok || !biopharmRes.ok || !consumablesRes.ok || !feedRes.ok || !logisticsRes.ok) {
+      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !frozenRes.ok || !biopharmRes.ok || !consumablesRes.ok || !feedRes.ok || !logisticsRes.ok || !companySalesRes.ok) {
         throw new Error('Failed to retrieve macro fundamental data from backend.');
       }
 
@@ -102,6 +108,7 @@ export const useAppData = (selectedSymbol: string) => {
       setConsumablesData(await consumablesRes.json());
       setFeedBreakdownData(await feedRes.json());
       setLogisticsSafetyData(await logisticsRes.json());
+      setCompanySalesData(await companySalesRes.json());
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || '网络连接异常，未能获取基本面数据');
@@ -155,6 +162,19 @@ export const useAppData = (selectedSymbol: string) => {
     }
   }, []);
 
+  const fetchAnalysisReport = useCallback(async () => {
+    try {
+      setIsReportLoading(true);
+      const res = await fetch(`${BASE_URL}/api/analysis/report`);
+      if (!res.ok) throw new Error('Failed to load comprehensive analysis report');
+      setAnalysisReportData(await res.json());
+    } catch (err) {
+      console.error('Fetch analysis report error:', err);
+    } finally {
+      setIsReportLoading(false);
+    }
+  }, []);
+
   const handleManualSync = async () => {
     try {
       setIsManualSyncing(true);
@@ -165,7 +185,8 @@ export const useAppData = (selectedSymbol: string) => {
         fetchStaticData(),
         fetchRealtimeQuotes(),
         fetchKline(selectedSymbolRef.current),
-        fetchYijingForecast()
+        fetchYijingForecast(),
+        fetchAnalysisReport()
       ]);
       alert('所有基本面数据同步完成！');
     } catch (err: any) {
@@ -183,7 +204,8 @@ export const useAppData = (selectedSymbol: string) => {
         fetchStaticData(),
         fetchRealtimeQuotes(),
         fetchKline(selectedSymbolRef.current),
-        fetchYijingForecast()
+        fetchYijingForecast(),
+        fetchAnalysisReport()
       ]);
       setIsLoading(false);
     };
@@ -204,6 +226,7 @@ export const useAppData = (selectedSymbol: string) => {
             fetchRealtimeQuotes();
             fetchKline(selectedSymbolRef.current);
             fetchYijingForecast();
+            fetchAnalysisReport();
           }, 0);
           const newInterval = pickRandomInterval();
           return newInterval;
@@ -236,16 +259,20 @@ export const useAppData = (selectedSymbol: string) => {
     consumablesData,
     feedBreakdownData,
     logisticsSafetyData,
+    companySalesData,
+    analysisReportData,
     isLoading,
     isRealtimePolling,
     isManualSyncing,
     isYijingLoading,
+    isReportLoading,
     lastSyncTime,
     errorMsg,
     nextRefreshSec,
     fetchKline,
     fetchRealtimeQuotes,
     fetchYijingForecast,
+    fetchAnalysisReport,
     handleManualSync
   };
 };

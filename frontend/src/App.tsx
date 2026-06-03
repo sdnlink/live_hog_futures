@@ -11,6 +11,7 @@ import MainCharts from './components/MainCharts';
 import BreedingCalculator from './components/BreedingCalculator';
 import YijingPanel from './components/YijingPanel';
 import BottomDashboard from './components/BottomDashboard';
+import AnalysisReportPanel from './components/AnalysisReportPanel';
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('LH0');
@@ -35,19 +36,23 @@ function App() {
     consumablesData,
     feedBreakdownData,
     logisticsSafetyData,
+    companySalesData,
+    analysisReportData,
     isLoading,
+    isReportLoading,
     isManualSyncing,
     isYijingLoading,
     lastSyncTime,
     fetchKline,
     fetchRealtimeQuotes,
     fetchYijingForecast,
+    fetchAnalysisReport,
     handleManualSync
   } = useAppData(selectedSymbol);
 
   // UI Interactive States
   const [activePage, setActivePage] = useState<'terminal' | 'macro-stocks'>('terminal');
-  const [activeChartTab, setActiveChartTab] = useState<string>('spot-futures');
+  const [activeChartTab, setActiveChartTab] = useState<string>('analysis-report');
   const [activeAdviceTab, setActiveAdviceTab] = useState<'farmers' | 'middle' | 'traders'>('farmers');
   const [timeRange, setTimeRange] = useState<'30d' | '90d' | '180d' | 'all'>('all');
 
@@ -232,9 +237,29 @@ function App() {
             <article className="glass-panel" style={{ minWidth: 0 }}>
               <div className="panel-title-bar" style={{ marginBottom: '8px' }}>
                 <div className="chart-tabs-bar">
-                  {['spot-futures', 'basis', 'cost-profits', 'capacity', 'upstream-supplies', 'logistics-feed', 'frozen-pork', 'calculator', 'yijing'].map(tab => (
-                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); }}>
-                      {tab === 'spot-futures' ? '期现收敛' : tab === 'basis' ? '历史基差' : tab === 'cost-profits' ? '养殖成本利润' : tab === 'capacity' ? '生猪产能' : tab === 'upstream-supplies' ? '动保与繁育物料' : tab === 'logistics-feed' ? '饲料与调运物流' : tab === 'frozen-pork' ? '冻品仓储' : tab === 'calculator' ? '成本计算器' : '☯ 易卦决策'}
+                  {['analysis-report', 'spot-futures', 'basis', 'cost-profits', 'capacity', 'upstream-supplies', 'logistics-feed', 'frozen-pork', 'calculator', 'yijing'].map(tab => (
+                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''} ${tab === 'analysis-report' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); if (tab === 'analysis-report') fetchAnalysisReport(); }}>
+                      <span>
+                        {tab === 'analysis-report' ? '☯ 综合决策报告' :
+                         tab === 'spot-futures' ? '期现收敛' : 
+                         tab === 'basis' ? '历史基差' : 
+                         tab === 'cost-profits' ? '养殖成本利润' : 
+                         tab === 'capacity' ? '生猪产能' : 
+                         tab === 'upstream-supplies' ? '动保与繁育物料' : 
+                         tab === 'logistics-feed' ? '饲料与调运物流' : 
+                         tab === 'frozen-pork' ? '冻品仓储' : 
+                         tab === 'calculator' ? '成本计算器' : 
+                         '☯ 易卦决策'}
+                      </span>
+                      {['capacity', 'upstream-supplies', 'logistics-feed', 'frozen-pork'].includes(tab) && (
+                        <span className="predict-badge">含估算预测</span>
+                      )}
+                      {tab === 'yijing' && (
+                        <span className="predict-badge yijing-badge">全预测</span>
+                      )}
+                      {tab === 'analysis-report' && (
+                        <span className="predict-badge yijing-badge">多维交叉</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -248,21 +273,32 @@ function App() {
               </div>
 
               <div className="chart-viewport" style={
-                activeChartTab === 'capacity' ? { height: '1200px' } :
+                activeChartTab === 'analysis-report' ? { height: 'auto', minHeight: '600px' } :
+                activeChartTab === 'capacity' ? { height: '1600px' } :
                 (activeChartTab === 'frozen-pork' || activeChartTab === 'upstream-supplies' || activeChartTab === 'logistics-feed') ? { height: '820px' } : 
                 activeChartTab === 'yijing' ? { height: 'auto', minHeight: '1000px' } : 
                 activeChartTab === 'calculator' ? { height: 'auto', minHeight: '480px' } : 
                 undefined
               }>
-                <MainCharts 
-                  activeChartTab={activeChartTab} spotBasisData={spotBasisData} klineData={klineData}
-                  porkPriceData={porkPriceData} costsData={costsData} capacityData={capacityData}
-                  weeklyCapacityData={weeklyCapacityData} dailyCapacityData={dailyCapacityData}
-                  frozenPorkData={frozenPorkData}
-                  biopharmData={biopharmData} consumablesData={consumablesData}
-                  feedBreakdownData={feedBreakdownData} logisticsSafetyData={logisticsSafetyData}
-                  selectedSymbol={selectedSymbol} filterByTimeRange={filterByTimeRange}
-                />
+                {activeChartTab !== 'analysis-report' && (
+                  <MainCharts 
+                    activeChartTab={activeChartTab} spotBasisData={spotBasisData} klineData={klineData}
+                    porkPriceData={porkPriceData} costsData={costsData} capacityData={capacityData}
+                    weeklyCapacityData={weeklyCapacityData} dailyCapacityData={dailyCapacityData}
+                    frozenPorkData={frozenPorkData}
+                    biopharmData={biopharmData} consumablesData={consumablesData}
+                    feedBreakdownData={feedBreakdownData} logisticsSafetyData={logisticsSafetyData}
+                    companySalesData={companySalesData}
+                    selectedSymbol={selectedSymbol} filterByTimeRange={filterByTimeRange}
+                  />
+                )}
+                {activeChartTab === 'analysis-report' && (
+                  <AnalysisReportPanel 
+                    reportData={analysisReportData}
+                    isLoading={isReportLoading}
+                    onRefresh={fetchAnalysisReport}
+                  />
+                )}
                 {activeChartTab === 'calculator' && (
                   <BreedingCalculator 
                     calcInputs={calcInputs} calcResults={calcResults} 

@@ -223,3 +223,21 @@ class YijingForecastRecord(Base):
     )
 
 
+class CompanyMonthlySales(Base):
+    """上市公司月度生猪销量、价格与销售额数据表"""
+    __tablename__ = "company_monthly_sales"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String(20), index=True)                # 股票代码
+    name = Column(String(50))                              # 公司简称
+    date = Column(Date, index=True)                         # 报告期月份 (月末日期)
+    sales_volume = Column(Float, nullable=True)            # 销售量 (万头)
+    sales_price = Column(Float, nullable=True)             # 销售均价 (元/公斤)
+    sales_revenue = Column(Float, nullable=True)           # 销售额 (万元)
+
+    __table_args__ = (
+        Index('idx_company_sales_date', 'symbol', 'date', unique=True),
+    )
+
+
+

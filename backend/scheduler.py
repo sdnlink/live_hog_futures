@@ -2,12 +2,17 @@ import time
 import datetime
 import threading
 import traceback
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from .database import SessionLocal
+from .logger import logger
 from .scraper import (
     fetch_live_futures, fetch_spot_prices, fetch_provincial_prices,
     fetch_breeding_indicators, fetch_swine_capacity, fetch_sentiment_radar,
     LH_CONTRACTS, fetch_historical_kline, fetch_pork_prices,
-    fetch_live_stocks, fetch_stock_klines, fetch_frozen_pork_storage
+    fetch_live_stocks, fetch_stock_klines, fetch_frozen_pork_storage,
+    fetch_epidemic_reports, fetch_biopharm_data, fetch_consumables_data,
+    fetch_feed_breakdown, fetch_logistics_safety
 )
 
 # Global flag to control scheduler
@@ -99,6 +104,13 @@ def daily_scheduler_loop():
                     fetch_stock_klines(db)
                     fetch_live_stocks(db)
                     fetch_frozen_pork_storage(db)
+                    
+                    # Sync epidemic reports and upstream alternative indicators
+                    fetch_epidemic_reports(db)
+                    fetch_biopharm_data(db)
+                    fetch_consumables_data(db)
+                    fetch_feed_breakdown(db)
+                    fetch_logistics_safety(db)
                 finally:
                     db.close()
                     
@@ -161,6 +173,13 @@ def random_sync_scheduler_loop():
                 fetch_live_stocks(db)
                 fetch_frozen_pork_storage(db)
                 
+                # 9. Epidemic reports & upstream alternative indicators
+                fetch_epidemic_reports(db)
+                fetch_biopharm_data(db)
+                fetch_consumables_data(db)
+                fetch_feed_breakdown(db)
+                fetch_logistics_safety(db)
+                
                 print("Automatic background full synchronization completed successfully.")
             except Exception as ex:
                 print("Error during background full synchronization:", ex)
@@ -174,6 +193,61 @@ def random_sync_scheduler_loop():
             
     print("Random interval full synchronization scheduler loop stopped.")
 
+def acquire_scheduler_lock(db: Session) -> bool:
+    """Acquire a PostgreSQL advisory lock to ensure only one process runs the scheduler."""
+    try:
+        dialect = db.bind.dialect.name
+        if dialect == "postgresql":
+            # 7890123 is a unique 64-bit lock ID
+            result = db.execute(text("SELECT pg_try_advisory_lock(7890123)")).scalar()
+            return bool(result)
+        else:
+            # Fall back to True for SQLite (local testing)
+            return True
+    except Exception as e:
+        logger.error(f"Failed to acquire PostgreSQL advisory lock: {e}")
+        return True
+
+def release_scheduler_lock(db: Session):
+    """Release the PostgreSQL advisory lock."""
+    try:
+        dialect = db.bind.dialect.name
+        if dialect == "postgresql":
+            db.execute(text("SELECT pg_advisory_unlock(7890123)"))
+    except Exception as e:
+        logger.error(f"Failed to release PostgreSQL advisory lock: {e}")
+
+def scheduler_coordinator():
+    """Coordinator thread to acquire lock and run background scheduler loops."""
+    global _running
+    db = SessionLocal()
+    try:
+        if not acquire_scheduler_lock(db):
+            logger.info("Another process holds the scheduler lock. Skipping scheduler startup in this process.")
+            _running = False
+            return
+            
+        logger.info("Scheduler lock acquired. Starting background loops...")
+        
+        t1 = threading.Thread(target=realtime_scheduler_loop, daemon=True)
+        t1.start()
+        
+        t2 = threading.Thread(target=daily_scheduler_loop, daemon=True)
+        t2.start()
+        
+        t3 = threading.Thread(target=random_sync_scheduler_loop, daemon=True)
+        t3.start()
+        
+        while _running:
+            time.sleep(5)
+            
+    except Exception as e:
+        logger.error(f"Error in scheduler coordinator: {e}", exc_info=True)
+    finally:
+        release_scheduler_lock(db)
+        db.close()
+        logger.info("Scheduler coordinator stopped and lock released.")
+
 def start_scheduler():
     global _running
     if _running:
@@ -181,18 +255,11 @@ def start_scheduler():
         
     _running = True
     
-    t1 = threading.Thread(target=realtime_scheduler_loop, daemon=True)
-    t1.start()
-    
-    t2 = threading.Thread(target=daily_scheduler_loop, daemon=True)
-    t2.start()
-    
-    t3 = threading.Thread(target=random_sync_scheduler_loop, daemon=True)
-    t3.start()
-    
-    print("Background schedulers successfully initialized.")
+    t = threading.Thread(target=scheduler_coordinator, daemon=True)
+    t.start()
+    logger.info("Background scheduler coordinator initialized.")
 
 def stop_scheduler():
     global _running
     _running = False
-    print("Stopping background schedulers...")
+    logger.info("Stopping background schedulers...")
