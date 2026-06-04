@@ -41,10 +41,10 @@
 
 ### 2.1 模块划分
 
-*   `main.py`: 应用入口，定义了所有的 RESTful 路由（Endpoints），并处理应用的启动与关闭事件。
-*   `models.py`: 定义了基于 SQLAlchemy 的 ORM 数据模型，将数据库表结构映射为 Python 类。
+*   `main.py`: 应用入口，定义了所有的 RESTful 路由（Endpoints，新增动保/饲料/深加工需求/物流等多维度接口），并处理应用的启动与关闭事件。
+*   `models.py`: 定义了基于 SQLAlchemy 的 ORM 数据模型，将数据库表结构映射为 Python 类（包括 SentimentIndex, BiopharmaceuticalProcurement, FeedSalesBreakdown, HogLogisticsAndSafety, PorkDownstreamDemand 等舆情与替代指标表）。
 *   `database.py`: 处理数据库连接池和 Session 管理。
-*   `scraper.py`: 核心数据采集模块，封装了与 AkShare 和新浪财经等外部 API 的交互逻辑。
+*   `scraper.py`: 核心数据采集模块，集成了搜猪网、东方财富、同花顺等多渠道舆情爬虫引擎，以及动保/饲料/物流等多维替代数据拟合推演器。
 *   `scheduler.py`: 实现了基于 `APScheduler` 的后台定时任务，负责在交易时段或特定周期自动轮询并更新数据。
 *   `yijing.py`: 独立的预测算法引擎模块。
 

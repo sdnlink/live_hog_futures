@@ -69,6 +69,8 @@ def main():
         {"path": "/api/fundamentals/feed_breakdown", "method": "GET", "validate": lambda data: isinstance(data, list)},
         # 17. Logistics and safety
         {"path": "/api/fundamentals/logistics_safety", "method": "GET", "validate": lambda data: isinstance(data, list)},
+        # 17b. Downstream demand and deep processing
+        {"path": "/api/fundamentals/downstream_demand", "method": "GET", "validate": lambda data: isinstance(data, list)},
         # 18. Expert advice
         {"path": "/api/expert/advice", "method": "GET", "params": {"symbol": "LH0"}, "validate": lambda data: isinstance(data, dict) and data.get("status") == "success"},
         # 19. Yijing forecast

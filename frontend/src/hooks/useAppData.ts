@@ -14,7 +14,12 @@ import type {
   StockKline,
   StockQuote,
   CompanyMonthlySales,
-  AnalysisReportResponse
+  AnalysisReportResponse,
+  BiopharmaceuticalProcurement,
+  BreedingConsumable,
+  FeedSalesBreakdown,
+  HogLogisticsSafety,
+  PorkDownstreamDemand
 } from '../types';
 
 const BASE_URL = '/sys1';
@@ -41,6 +46,12 @@ export const useAppData = (selectedSymbol: string) => {
   const [stockQuotes, setStockQuotes] = useState<StockQuote[]>([]);
   const [companySalesData, setCompanySalesData] = useState<CompanyMonthlySales[]>([]);
 
+  const [biopharmData, setBiopharmData] = useState<BiopharmaceuticalProcurement[]>([]);
+  const [consumablesData, setConsumablesData] = useState<BreedingConsumable[]>([]);
+  const [feedBreakdownData, setFeedBreakdownData] = useState<FeedSalesBreakdown[]>([]);
+  const [logisticsSafetyData, setHogLogisticsSafety] = useState<HogLogisticsSafety[]>([]);
+  const [downstreamDemandData, setPorkDownstreamDemand] = useState<PorkDownstreamDemand[]>([]);
+
   // Status States
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRealtimePolling, setIsRealtimePolling] = useState<boolean>(false);
@@ -60,7 +71,7 @@ export const useAppData = (selectedSymbol: string) => {
   const fetchStaticData = useCallback(async () => {
     try {
       setErrorMsg('');
-      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, companySalesRes] = await Promise.all([
+      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, companySalesRes, biopharmRes, consumablesRes, feedRes, logisticsRes, demandRes] = await Promise.all([
         fetch(`${BASE_URL}/api/spot/basis`),
         fetch(`${BASE_URL}/api/spot/provincial`),
         fetch(`${BASE_URL}/api/fundamentals/capacity?granularity=monthly`),
@@ -71,9 +82,14 @@ export const useAppData = (selectedSymbol: string) => {
         fetch(`${BASE_URL}/api/spot/pork`),
         fetch(`${BASE_URL}/api/stocks/trends`),
         fetch(`${BASE_URL}/api/fundamentals/company_sales`),
+        fetch(`${BASE_URL}/api/fundamentals/biopharm`),
+        fetch(`${BASE_URL}/api/fundamentals/consumables`),
+        fetch(`${BASE_URL}/api/fundamentals/feed_breakdown`),
+        fetch(`${BASE_URL}/api/fundamentals/logistics_safety`),
+        fetch(`${BASE_URL}/api/fundamentals/downstream_demand`),
       ]);
 
-      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !companySalesRes.ok) {
+      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !companySalesRes.ok || !biopharmRes.ok || !consumablesRes.ok || !feedRes.ok || !logisticsRes.ok || !demandRes.ok) {
         throw new Error('Failed to retrieve macro fundamental data from backend.');
       }
 
@@ -89,6 +105,11 @@ export const useAppData = (selectedSymbol: string) => {
       setPorkPriceData(await porkRes.json());
       setStockData(await stockRes.json());
       setCompanySalesData(await companySalesRes.json());
+      setBiopharmData(await biopharmRes.json());
+      setConsumablesData(await consumablesRes.json());
+      setFeedBreakdownData(await feedRes.json());
+      setHogLogisticsSafety(await logisticsRes.json());
+      setPorkDownstreamDemand(await demandRes.json());
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || '网络连接异常，未能获取基本面数据');
@@ -236,6 +257,11 @@ export const useAppData = (selectedSymbol: string) => {
     stockQuotes,
     companySalesData,
     analysisReportData,
+    biopharmData,
+    consumablesData,
+    feedBreakdownData,
+    logisticsSafetyData,
+    downstreamDemandData,
     isLoading,
     isRealtimePolling,
     isManualSyncing,

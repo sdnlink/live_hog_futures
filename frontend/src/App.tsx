@@ -12,6 +12,7 @@ import BreedingCalculator from './components/BreedingCalculator';
 import YijingPanel from './components/YijingPanel';
 import BottomDashboard from './components/BottomDashboard';
 import AnalysisReportPanel from './components/AnalysisReportPanel';
+import SentimentValidationPanel from './components/SentimentValidationPanel';
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('LH0');
@@ -32,6 +33,11 @@ function App() {
     stockQuotes,
     companySalesData,
     analysisReportData,
+    biopharmData,
+    feedBreakdownData,
+    logisticsSafetyData,
+    downstreamDemandData,
+    sentimentIndex,
     isLoading,
     isReportLoading,
     isManualSyncing,
@@ -231,22 +237,26 @@ function App() {
             <article className="glass-panel" style={{ minWidth: 0 }}>
               <div className="panel-title-bar" style={{ marginBottom: '8px' }}>
                 <div className="chart-tabs-bar">
-                  {['analysis-report', 'spot-futures', 'basis', 'cost-profits', 'capacity', 'calculator', 'yijing'].map(tab => (
-                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''} ${tab === 'analysis-report' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); if (tab === 'analysis-report') fetchAnalysisReport(); }}>
+                  {['analysis-report', 'sentiment-validation', 'spot-futures', 'basis', 'cost-profits', 'capacity', 'calculator', 'yijing'].map(tab => (
+                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''} ${tab === 'analysis-report' ? 'yijing-tab' : ''} ${tab === 'sentiment-validation' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); if (tab === 'analysis-report') fetchAnalysisReport(); }}>
                       <span>
-                        {tab === 'analysis-report' ? '☯ 综合决策报告' :
+                        {tab === 'analysis-report' ? '综合决策报告' :
+                         tab === 'sentiment-validation' ? '舆情交叉印证' :
                          tab === 'spot-futures' ? '期现收敛' : 
                          tab === 'basis' ? '历史基差' : 
                          tab === 'cost-profits' ? '养殖成本利润' : 
                          tab === 'capacity' ? '生猪产能' : 
                          tab === 'calculator' ? '成本计算器' : 
-                         '☯ 易卦决策'}
+                         '易卦决策'}
                       </span>
                       {tab === 'yijing' && (
                         <span className="predict-badge yijing-badge">全预测</span>
                       )}
                       {tab === 'analysis-report' && (
                         <span className="predict-badge yijing-badge">多维交叉</span>
+                      )}
+                      {tab === 'sentiment-validation' && (
+                        <span className="predict-badge yijing-badge">前瞻舆情</span>
                       )}
                     </button>
                   ))}
@@ -262,6 +272,7 @@ function App() {
 
               <div className="chart-viewport" style={
                 activeChartTab === 'analysis-report' ? { height: 'auto', minHeight: '600px' } :
+                activeChartTab === 'sentiment-validation' ? { height: 'auto', minHeight: '800px' } :
                 activeChartTab === 'capacity' ? { height: '1600px' } :
                 activeChartTab === 'yijing' ? { height: 'auto', minHeight: '1000px' } : 
                 activeChartTab === 'calculator' ? { height: 'auto', minHeight: '480px' } : 
@@ -292,6 +303,16 @@ function App() {
                 )}
                 {activeChartTab === 'yijing' && (
                   <YijingPanel yijingForecast={yijingForecast} isYijingLoading={isYijingLoading} fetchYijingForecast={fetchYijingForecast} />
+                )}
+                {activeChartTab === 'sentiment-validation' && (
+                  <SentimentValidationPanel
+                    sentimentIndex={sentimentIndex}
+                    biopharmData={biopharmData}
+                    feedBreakdownData={feedBreakdownData}
+                    logisticsSafetyData={logisticsSafetyData}
+                    downstreamDemandData={downstreamDemandData}
+                    filterByTimeRange={filterByTimeRange}
+                  />
                 )}
               </div>
             </article>

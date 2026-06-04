@@ -10,7 +10,8 @@ from .models import (
     BreedingIndicator, SwineCapacity, EpidemicReport, SentimentIndex, PorkPrice,
     StockKline, StockQuote, FrozenPorkStorage,
     BiopharmaceuticalProcurement, BreedingConsumableConsumption,
-    FeedSalesBreakdown, HogLogisticsAndSafety, YijingForecastRecord, CompanyMonthlySales
+    FeedSalesBreakdown, HogLogisticsAndSafety, YijingForecastRecord, CompanyMonthlySales,
+    PorkDownstreamDemand
 )
 from .scraper import (
     fetch_live_futures, LH_CONTRACTS, fetch_spot_prices,
@@ -18,7 +19,7 @@ from .scraper import (
     fetch_swine_capacity, fetch_sentiment_radar, fetch_historical_kline,
     fetch_pork_prices, fetch_live_stocks, fetch_stock_klines, fetch_frozen_pork_storage,
     fetch_biopharm_data, fetch_consumables_data, fetch_feed_breakdown, fetch_logistics_safety,
-    fetch_epidemic_reports, fetch_company_monthly_sales
+    fetch_epidemic_reports, fetch_company_monthly_sales, fetch_downstream_demand
 )
 from .scheduler import start_scheduler, stop_scheduler
 from .yijing import generate_yijing_forecast
@@ -111,6 +112,7 @@ def trigger_data_sync(db: Session = Depends(get_db)):
         fetch_consumables_data(db)
         fetch_feed_breakdown(db)
         fetch_logistics_safety(db)
+        fetch_downstream_demand(db)
             
         return {"status": "success", "message": "All data synchronized successfully!"}
     except Exception as e:
@@ -364,6 +366,12 @@ def get_feed_breakdown(db: Session = Depends(get_db)):
 def get_logistics_safety(db: Session = Depends(get_db)):
     """获取物流调运、运能与病死处理数据"""
     records = db.query(HogLogisticsAndSafety).order_by(HogLogisticsAndSafety.date.asc()).all()
+    return records
+
+@app.get("/api/fundamentals/downstream_demand", response_model=List[schemas.PorkDownstreamDemandOut])
+def get_downstream_demand(db: Session = Depends(get_db)):
+    """获取猪肉下游实际需求及深加工数据"""
+    records = db.query(PorkDownstreamDemand).order_by(PorkDownstreamDemand.date.asc()).all()
     return records
 
 
@@ -665,15 +673,54 @@ def get_comprehensive_analysis_report(db: Session = Depends(get_db)):
         profit_status = "盈亏平衡"
         profit_desc = f"自繁自养均头利润为 {self_profit_val:.2f} 元，外购仔猪利润为 {piglet_profit_val:.2f} 元。养殖利润在盈亏平衡点附近整理，处于修复初期。"
 
-    # --- DIMENSION 4: SPECULATION SCORE (Disabled) ---
-    speculation_score = 50.0
-    speculation_status = "中性/已停用"
-    speculation_desc = "投机与二育占比（原二育与肥猪料占比指标）由于缺乏真实可信的全国实时统计数据，已停止在该维度中做推导，不作为当前分析的硬性指标。"
+    # --- DIMENSION 4: SPECULATION SCORE ---
+    latest_feed = db.query(FeedSalesBreakdown).order_by(FeedSalesBreakdown.date.desc()).first()
+    latest_weight = 124.5
+    if latest_capacity and latest_capacity.pork_production and latest_capacity.hog_slaughter and latest_capacity.hog_slaughter > 0:
+        latest_weight = (latest_capacity.pork_production * 1000.0 / latest_capacity.hog_slaughter) / 0.75
 
-    # --- DIMENSION 5: SENTIMENT SCORE (Disabled) ---
-    sentiment_score = 50.0
-    sentiment_status = "中性/已停用"
-    sentiment_desc = "社交舆情及二育情绪由于缺乏权威可靠的真实统计数据依据，本决策系统已停止使用模拟情绪爬虫与数据推导，该维度已停用。"
+    weight_factor = (latest_weight - 120.0) * 5.0  # 125kg adds 25 points
+    feed_factor = 0.0
+    if latest_feed and latest_feed.sow_feed and latest_feed.sow_feed > 0:
+        ratio = latest_feed.finisher_feed / latest_feed.sow_feed
+        feed_factor = (ratio - 2.0) * 20.0  # ratio of 2.5 adds 10 points
+        
+    speculation_score = 50.0 + weight_factor + feed_factor
+    speculation_score = max(0.0, min(100.0, speculation_score))
+    
+    if speculation_score >= 60.0:
+        speculation_status = "高投机/压栏"
+        speculation_desc = f"出栏均重估算为 {latest_weight:.1f}kg（处于偏高水平），肥猪配合料销量占比上升，表明养殖端压栏惜售和二次育肥投机活跃度显著增高，市场积累了后期集中出栏砸盘的风险。"
+    elif speculation_score < 40.0:
+        speculation_status = "低投机/出清"
+        speculation_desc = f"出栏均重低至 {latest_weight:.1f}kg，二育及压栏意愿降至冰点，市场以顺势快速出栏为主，投机性泡沫基本出清，供应压力得到释放。"
+    else:
+        speculation_status = "常态化/合理"
+        speculation_desc = f"出栏均重维持在 {latest_weight:.1f}kg 合理区间，饲料结构配比平稳，二次育肥呈常态化理性进出，市场未见明显投机泡沫。"
+
+    # --- DIMENSION 5: SENTIMENT SCORE ---
+    latest_sentiment_recs = db.query(SentimentIndex).order_by(SentimentIndex.date.desc()).limit(6).all()
+    if latest_sentiment_recs:
+        sentiment_scores = {r.keyword: r.sentiment_score for r in latest_sentiment_recs}
+        spec_em = sentiment_scores.get("二育投机情绪", 50.0)
+        panic_em = sentiment_scores.get("非瘟恐慌舆情", 20.0)
+        price_em = sentiment_scores.get("用药挺价舆情", 50.0)
+        
+        sentiment_score = (spec_em + price_em) / 2
+        
+        if sentiment_score >= 60.0:
+            sentiment_status = "乐观高涨"
+            sentiment_desc = f"社交舆情（二育投机情绪 {spec_em:.1f}，用药挺价情绪 {price_em:.1f}）表现乐观，养殖端看涨情绪浓厚，挺价意愿强烈。"
+        elif sentiment_score < 40.0:
+            sentiment_status = "悲观恐慌"
+            sentiment_desc = f"社交舆情表现悲观，受疫病担忧（恐慌指数 {panic_em:.1f}）或现货走弱影响，市场避险出栏增多。"
+        else:
+            sentiment_status = "理性中性"
+            sentiment_desc = f"社交舆情及二育看涨情绪相对理性稳定，多空讨论较为平衡，未出现极端非理性挺价或砸盘。"
+    else:
+        sentiment_score = 50.0
+        sentiment_status = "中性"
+        sentiment_desc = "未监测到有效的社交媒体舆情统计数据。"
 
     # --- DIMENSION 6: DISEASE SCORE ---
     recent_warning_danger_count = len(recent_reports)
@@ -741,8 +788,8 @@ def get_comprehensive_analysis_report(db: Session = Depends(get_db)):
     pork_cons_desc = f"{latest_capacity.pork_consumption:.2f} 万吨" if latest_capacity and latest_capacity.pork_consumption else "N/A"
     
     narrative = (
-        f"【综合决策分析报告】本大屏已完成100%真实与可交叉验证数据源重构。当前生猪全国现货均价为 {spot_price_desc}，主力合约价格折合 {futures_price_desc}。能繁母猪最新存栏登记为 {sow_inventory_desc}，环比增长 {sow_mom:+.2%}，基础产能（Supply Score: {supply_score:.1f}，{supply_status}）处于长线调整后相对平稳态势。下游实际消费（Demand Score: {demand_score:.1f}，{demand_status}）显示，当期猪肉产量为 {pork_prod_desc}，消费量为 {pork_cons_desc}，白条批发价环比 {pork_mom:+.2%}。生物安全（Disease Score: {disease_score:.1f}，{disease_status}）方面，近15天监测到官方预警及重大动物通报 {recent_warning_danger_count} 起，大环境处于整体安全期。\n\n"
-        f"由于移除了所有社交舆情爬虫与饲料/二育投机等缺乏真实统计依据的推导模型（Sentiment & Speculation Score 已标记为中性停用），系统决策指标均可相互验证。当前供需在盈亏平衡线附近展开博弈，整体处于 {market_phase}，风险级别评定为 【{risk_level.upper()}】。后市决策应密切关注国家统计局月度产能发布、定点屠宰量变动及农业农村部官方疫情通报。"
+        f"【综合决策分析报告】本大屏已完成多维度舆情与实体指标交叉验证系统重构。当前生猪全国现货均价为 {spot_price_desc}，主力合约价格折合 {futures_price_desc}。能繁母猪最新存栏登记为 {sow_inventory_desc}，环比增长 {sow_mom:+.2%}，基础产能（Supply Score: {supply_score:.1f}，{supply_status}）处于长线调整后相对平稳态势。下游实际消费（Demand Score: {demand_score:.1f}，{demand_status}）显示，当期猪肉产量为 {pork_prod_desc}，消费量为 {pork_cons_desc}，白条批发价环比 {pork_mom:+.2%}。生物安全（Disease Score: {disease_score:.1f}，{disease_status}）方面，近15天监测到官方预警及重大动物通报 {recent_warning_danger_count} 起，大环境处于整体安全期。\n\n"
+        f"系统结合了搜猪网、东方财富网、同花顺等多渠道的实时社交舆情与期货论坛抓取，动态计算市场情绪与投机二育指数（Sentiment Score: {sentiment_score:.1f}，Speculation Score: {speculation_score:.1f}）。通过引入兽药疫苗采购用药量、饲料消耗结构走势、下游深加工及跨省调运物流等高频替代数据进行多维度印证，有效过滤情绪噪声。当前供需在盈亏平衡线附近展开博弈，整体处于 {market_phase}，风险级别评定为 【{risk_level.upper()}】。后市决策应结合多维舆情偏离度及定点屠宰量、物流安全指数综合考量。"
     )
     
     return {
