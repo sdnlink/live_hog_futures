@@ -54,6 +54,44 @@
 *   `models.py` 中为高频查询的字段（如 `symbol`, `date`, `keyword`）建立了联合索引（`Index`），以优化时间序列数据的查询性能。
 *   提供了 `init_db.py` 和 `seed_data.py` 用于快速初始化表结构和灌入历史种子数据。
 
+### 2.3 核心数据表结构规约 (AI 视角)
+
+为了便于未来 AI 编码助手直接解析，以下是新增舆情及替代指标的完整 Schema 定义：
+
+| 物理表名 | 对应 ORM 类名 | 字段名称 & 类型 | 索引 & 约束 | 业务释义 |
+| :--- | :--- | :--- | :--- | :--- |
+| `sentiment_indices` | `SentimentIndex` | `id` (INTEGER, PK)<br>`date` (DATE)<br>`keyword` (VARCHAR(50))<br>`frequency` (INTEGER)<br>`sentiment_score` (FLOAT) | Unique(`keyword`, `date`) | 社交舆情词频及情绪打分 |
+| `biopharmaceutical_procurements` | `BiopharmaceuticalProcurement` | `id` (INTEGER, PK)<br>`date` (DATE, UNIQUE)<br>`swine_fever_vaccine` (FLOAT)<br>`prrs_vaccine` (FLOAT)<br>`fmd_vaccine` (FLOAT)<br>`diarrhea_vaccine` (FLOAT)<br>`altrenogest_sales` (FLOAT)<br>`oxytocin_sales` (FLOAT)<br>`vaccine_index` (FLOAT) | Unique(`date`) | 兽医疫苗采购数据（万支），用药量物理校验 |
+| `breeding_consumable_consumptions` | `BreedingConsumableConsumption` | `id` (INTEGER, PK)<br>`date` (DATE, UNIQUE)<br>`insemination_catheters` (FLOAT)<br>`semen_extender` (FLOAT)<br>`farrowing_dry_powder` (FLOAT)<br>`iron_injection` (FLOAT)<br>`ear_tags` (FLOAT) | Unique(`date`) | 母猪产房耗材用量，校验育肥前置产能 |
+| `feed_sales_breakdowns` | `FeedSalesBreakdown` | `id` (INTEGER, PK)<br>`date` (DATE, UNIQUE)<br>`sow_feed` (FLOAT)<br>`piglet_feed` (FLOAT)<br>`grower_feed` (FLOAT)<br>`finisher_feed` (FLOAT)<br>`overall_feed_volume` (FLOAT) | Unique(`date`) | 饲料细分（母猪、仔猪、中猪、大猪）销量（万吨） |
+| `hog_logistics_and_safety` | `HogLogisticsAndSafety` | `id` (INTEGER, PK)<br>`date` (DATE, UNIQUE)<br>`quarantine_certificates` (INTEGER)<br>`transport_freight_index` (FLOAT)<br>`mortality_waste_disposal` (FLOAT) | Unique(`date`) | 跨省调运检疫票（张）、运费指数、病死猪处理量（吨） |
+| `pork_downstream_demand` | `PorkDownstreamDemand` | `id` (INTEGER, PK)<br>`date` (DATE, UNIQUE)<br>`pork_production` (FLOAT)<br>`pork_consumption` (FLOAT)<br>`feed_supply` (FLOAT)<br>`processed_pork_demand` (FLOAT)<br>`catering_pork_demand` (FLOAT) | Unique(`date`) | 猪肉生产消费量、深加工制品、餐饮渠道实际需求（万吨） |
+
+### 2.4 后端 REST API 接口定义 (AI 视角)
+
+AI 消费或扩展系统时可调用的前瞻印证相关 REST API 路由列表：
+
+1.  **`/api/fundamentals/biopharm` (GET)**
+    *   **返回格式**: `Array<BiopharmaceuticalProcurement>`
+    *   **业务描述**: 暴露兽用疫苗、动保相关采购统计时序。
+2.  **`/api/fundamentals/consumables` (GET)**
+    *   **返回格式**: `Array<BreedingConsumableConsumption>`
+    *   **业务描述**: 暴露产房输精管、稀释剂等辅助用品销量时序。
+3.  **`/api/fundamentals/feed_breakdown` (GET)**
+    *   **返回格式**: `Array<FeedSalesBreakdown>`
+    *   **业务描述**: 暴露四阶段饲料消耗明细时序。
+4.  **`/api/fundamentals/logistics_safety` (GET)**
+    *   **返回格式**: `Array<HogLogisticsAndSafety>`
+    *   **业务描述**: 暴露省际生猪调运检疫车次、运费指数及病死量时序。
+5.  **`/api/fundamentals/downstream_demand` (GET)**
+    *   **返回格式**: `Array<PorkDownstreamDemand>`
+    *   **业务描述**: 暴露白条批发、深加工食品制品及商用餐饮肉类需求。
+6.  **`/api/analysis/report` (GET)**
+    *   **返回格式**: 综合决策 JSON（包含 `summary`, `dimensions` 包括 `sentiment` 与 `speculation` 动态评分, `narrative` 段落描述）。
+7.  **`/api/sync/all` (POST)**
+    *   **返回格式**: `{"status": "success", "message": "..."}`
+    *   **业务描述**: 激活后台爬虫执行链（Sina, AkShare + Soozhu/EastMoney/Flush 舆情爬虫网）。
+
 ## 3. 前端设计 (Frontend Design)
 
 前端是一个单页面应用（SPA），以数据可视化大屏（Dashboard）的形式呈现。
