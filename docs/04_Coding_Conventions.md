@@ -99,3 +99,23 @@
 3.  **数据库约束校验**：
     - **命令**：若修改了 `models.py`，必须重新执行 `venv/bin/python -m backend.seed_data` 校验新表结构和约束在数据存入时无约束冲突（Integrity Error）。
 
+### 4.3 自动化格式化与提交工具 (`commit.sh`)
+为了简化上述流程并确保每一次提交均完全符合代码标准，项目根目录下提供了一键自动化提交工具 [commit.sh](file:///home/skn01/qihuo/commit.sh)。
+
+#### 功能特点
+- **自动格式化**：自动执行 `venv/bin/black` 对后端 Python 代码进行规范化排版，并执行 `eslint --fix` 自动修复前端的常见语法规范问题。
+- **质量前置校验**：顺序运行前端 `npm run build` 静态编译检查与后端 `test_api.py` 覆盖测试。若有任何一处报错，自动中止提交并输出报错日志。
+- **语义化提交引导**：提供交互式命令行，引导开发者选择更改类型、输入范围以及主体描述，确保 Git commit 信息完全满足 4.1 节要求。
+
+#### 使用方法
+*   **交互式使用**：
+    ```bash
+    ./commit.sh
+    ```
+*   **非交互式使用（适合自动化脚本/AI 助手直接提交）**：
+    ```bash
+    ./commit.sh -t <type> -s <scope> -m <message>
+    ```
+    *   例如：`./commit.sh -t feat -s scraper -m "新增同花顺舆情抓取"`
+
+
