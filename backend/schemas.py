@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any
 
+
 class FuturesQuoteOut(BaseModel):
     id: int
     symbol: str
@@ -24,6 +25,7 @@ class FuturesQuoteOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class FuturesKlineOut(BaseModel):
     id: int
     symbol: str
@@ -39,6 +41,7 @@ class FuturesKlineOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class SpotPriceOut(BaseModel):
     id: int
     date: date
@@ -47,6 +50,7 @@ class SpotPriceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class ProvincialPriceOut(BaseModel):
     id: int
@@ -57,6 +61,7 @@ class ProvincialPriceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class BreedingIndicatorOut(BaseModel):
     id: int
@@ -69,6 +74,7 @@ class BreedingIndicatorOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class SwineCapacityOut(BaseModel):
     id: int
@@ -85,6 +91,7 @@ class SwineCapacityOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class PorkPriceOut(BaseModel):
     id: int
     date: date
@@ -92,6 +99,7 @@ class PorkPriceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class EpidemicReportOut(BaseModel):
     id: int
@@ -105,6 +113,7 @@ class EpidemicReportOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class SentimentIndexOut(BaseModel):
     id: int
     date: date
@@ -114,6 +123,7 @@ class SentimentIndexOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class ExpertAdviceOut(BaseModel):
     status: str
@@ -129,6 +139,7 @@ class ExpertAdviceOut(BaseModel):
     conclusion: Dict[str, Any]
     advice: Dict[str, Any]
 
+
 class StockKlineOut(BaseModel):
     id: int
     symbol: str
@@ -142,6 +153,7 @@ class StockKlineOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class StockQuoteOut(BaseModel):
     id: int
@@ -161,6 +173,7 @@ class StockQuoteOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class FrozenPorkStorageOut(BaseModel):
     id: int
     date: date
@@ -170,6 +183,7 @@ class FrozenPorkStorageOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class BiopharmaceuticalProcurementOut(BaseModel):
     id: int
@@ -185,6 +199,7 @@ class BiopharmaceuticalProcurementOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class BreedingConsumableConsumptionOut(BaseModel):
     id: int
     date: date
@@ -197,6 +212,7 @@ class BreedingConsumableConsumptionOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class FeedSalesBreakdownOut(BaseModel):
     id: int
     date: date
@@ -208,6 +224,7 @@ class FeedSalesBreakdownOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class HogLogisticsAndSafetyOut(BaseModel):
     id: int
@@ -362,9 +379,3 @@ class PorkDownstreamDemandOut(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-
-
-
-

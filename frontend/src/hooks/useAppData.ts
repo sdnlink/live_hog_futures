@@ -215,7 +215,7 @@ export const useAppData = (selectedSymbol: string) => {
     const TICK_SEC = 10;
     const pickRandomInterval = () => Math.round((Math.floor(Math.random() * (600 - 60 + 1)) + 60) / TICK_SEC) * TICK_SEC;
 
-    let remainingSec = pickRandomInterval();
+    const remainingSec = pickRandomInterval();
     setNextRefreshSec(remainingSec);
 
     const timer = setInterval(() => {
