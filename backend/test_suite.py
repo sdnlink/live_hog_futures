@@ -17,6 +17,7 @@ from backend.models import (
     BreedingConsumableConsumption,
     FeedSalesBreakdown,
     HogLogisticsAndSafety,
+    BreedingEfficiency,
 )
 
 
@@ -455,3 +456,173 @@ def test_api_comprehensive_analysis_report():
     assert "threats" in data["swot"]
 
     app.dependency_overrides.clear()
+
+
+# 8. Test Quantitative Forecast Engine Cost and Seasonality
+def test_forecast_engine_cost_and_seasonality():
+    from backend.forecast_engine import calculate_dynamic_breeding_cost, get_smooth_seasonal_factor
+
+    cost = calculate_dynamic_breeding_cost(corn_price_ton=2350.0, soy_price_ton=3350.0)
+    assert "cash_cost_line" in cost
+    assert "full_cost_line" in cost
+    # Full cost must exceed cash cost
+    assert cost["full_cost_line"] > cost["cash_cost_line"]
+    # Check realistic price ranges (9.5 ~ 17.5)
+    assert 9.5 <= cost["cash_cost_line"] <= 15.0
+    assert 12.0 <= cost["full_cost_line"] <= 18.0
+
+    # Seasonality check: Jan/Dec peak, Feb slump
+    dec_season = get_smooth_seasonal_factor(datetime.date(2026, 12, 15))
+    feb_season = get_smooth_seasonal_factor(datetime.date(2026, 2, 15))
+    assert dec_season > 1.10
+    assert feb_season < 0.90
+
+
+# 9. Test API Price Trend Forecast Endpoint
+def test_api_price_trend_forecast():
+    client = TestClient(app)
+    mock_db = MagicMock()
+    today = datetime.date.today()
+
+    mock_spot = SpotPrice(id=1, date=today, price=15.5)
+    mock_quote = FuturesQuote(id=1, symbol="LH0", last_price=14200.0)
+    mock_indicator = BreedingIndicator(
+        id=1, date=today, corn_price=2350.0, soybean_price=3350.0
+    )
+    mock_capacity = SwineCapacity(
+        id=1, date=today, maternal_sow_inventory=4040.0, pork_production=410.0, hog_slaughter=3.1
+    )
+    mock_eff = BreedingEfficiency(id=1, date=today, psy=21.5)
+    mock_feed = FeedSalesBreakdown(id=1, date=today, finisher_feed=42.0, sow_feed=20.0)
+
+    def side_effect(model_class):
+        if model_class is SpotPrice:
+            return MockQuery(SpotPrice, mock_spot)
+        elif model_class is FuturesQuote:
+            return MockQuery(FuturesQuote, mock_quote)
+        elif model_class is BreedingIndicator:
+            return MockQuery(BreedingIndicator, mock_indicator)
+        elif model_class is SwineCapacity:
+            return MockQuery(SwineCapacity, [mock_capacity, mock_capacity])
+        elif model_class is BreedingEfficiency:
+            return MockQuery(BreedingEfficiency, mock_eff)
+        elif model_class is FeedSalesBreakdown:
+            return MockQuery(FeedSalesBreakdown, mock_feed)
+        return MockQuery(model_class)
+
+    mock_db.query.side_effect = side_effect
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    response = client.get("/api/forecast/price_trend", params={"symbol": "LH0"})
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "success"
+    assert "horizons" in data
+    assert len(data["horizons"]) == 10
+    assert "trajectory_90d" in data
+    assert len(data["trajectory_90d"]) == 90
+    assert "cohort" in data
+    assert "cost" in data
+    assert "drivers" in data
+    assert "forecast_narrative" in data
+
+    # Verify first horizon (1d) and medium horizon (30d)
+    h1 = data["horizons"][0]
+    assert h1["horizon"] == "1d"
+    assert h1["high"] >= h1["mid"] >= h1["low"]
+
+    h30 = data["horizons"][6]
+    assert h30["horizon"] == "30d"
+    assert h30["high"] >= h30["mid"] >= h30["low"]
+
+    # Verify trajectory format
+    t1 = data["trajectory_90d"][0]
+    assert t1["days_ahead"] == 1
+    assert "price_mid" in t1
+    assert "price_upper" in t1
+    assert "price_lower" in t1
+
+    app.dependency_overrides.clear()
+
+
+def test_forecast_engine_scenario_shocks():
+    """Verify that scenario stress test shocks properly adjust cost and supply predictions"""
+    client = TestClient(app)
+    mock_db = MagicMock()
+
+    today = datetime.date.today()
+    mock_spot = SpotPrice(date=today, price=15.0)
+    mock_quote = FuturesQuote(symbol="LH0", last_price=14000.0)
+    mock_indicator = BreedingIndicator(date=today, corn_price=2300.0, soybean_price=3300.0)
+    mock_capacity = SwineCapacity(date=today, maternal_sow_inventory=4000.0)
+    mock_efficiency = BreedingEfficiency(date=today, psy=21.0)
+    mock_feed = FeedSalesBreakdown(date=today, finisher_feed=40.0, sow_feed=20.0)
+
+    def side_effect(model_class):
+        if model_class is SpotPrice:
+            return MockQuery(SpotPrice, mock_spot)
+        elif model_class is FuturesQuote:
+            return MockQuery(FuturesQuote, mock_quote)
+        elif model_class is BreedingIndicator:
+            return MockQuery(BreedingIndicator, mock_indicator)
+        elif model_class is SwineCapacity:
+            return MockQuery(SwineCapacity, mock_capacity)
+        elif model_class is BreedingEfficiency:
+            return MockQuery(BreedingEfficiency, mock_efficiency)
+        elif model_class is FeedSalesBreakdown:
+            return MockQuery(FeedSalesBreakdown, mock_feed)
+        return MockQuery(model_class)
+
+    mock_db.query.side_effect = side_effect
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    # 1. Base forecast
+    base_res = client.get("/api/forecast/price_trend", params={"symbol": "LH0"}).json()
+    base_full_cost = base_res["cost"]["full_cost_line"]
+    base_pork_supply = base_res["cohort"]["projected_pork_supply"]
+
+    # 2. Feed cost shock (+20%)
+    shock_feed = client.get("/api/forecast/price_trend", params={
+        "symbol": "LH0",
+        "feed_cost_shock_pct": 20.0
+    }).json()
+    assert shock_feed["cost"]["full_cost_line"] > base_full_cost
+
+    # 3. Sow capacity reduction (-10%)
+    shock_sow = client.get("/api/forecast/price_trend", params={
+        "symbol": "LH0",
+        "sow_shock_pct": -10.0
+    }).json()
+    assert shock_sow["cohort"]["projected_pork_supply"] < base_pork_supply
+
+    app.dependency_overrides.clear()
+
+
+def test_forecast_engine_delivery_month_convergence():
+    """Verify that specific delivery month contracts (e.g. LH2501) parse delivery date and converge basis"""
+    from backend.forecast_engine import get_contract_delivery_date, compute_expected_basis, calculate_price_forecast
+
+    # Test delivery date parser
+    d_jan = get_contract_delivery_date("LH2501")
+    assert d_jan == datetime.date(2025, 1, 15)
+
+    d_nov = get_contract_delivery_date("lh2411")
+    assert d_nov == datetime.date(2024, 11, 15)
+
+    assert get_contract_delivery_date("LH0") is None
+    assert get_contract_delivery_date("INVALID") is None
+
+    # Test expected basis convergence
+    # Case A: 30 days to delivery, day 30 should reach 0.0
+    basis_initial = 1200.0
+    exp_at_30 = compute_expected_basis(basis_initial, day_step=30, days_to_delivery=30)
+    assert exp_at_30 == 0.0
+
+    exp_at_15 = compute_expected_basis(basis_initial, day_step=15, days_to_delivery=30)
+    assert 0.0 < exp_at_15 < basis_initial
+
+    # Case B: continuous index without delivery date
+    exp_continuous = compute_expected_basis(basis_initial, day_step=30, days_to_delivery=None)
+    assert 0.0 < exp_continuous < basis_initial
+

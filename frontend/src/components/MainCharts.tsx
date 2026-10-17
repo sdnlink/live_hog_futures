@@ -15,7 +15,8 @@ import {
   LineChart
 } from 'recharts';
 import type {
-  FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator, CompanyMonthlySales
+  FuturesKline, SpotPrice, PorkPrice, SwineCapacity, BreedingIndicator, CompanyMonthlySales,
+  SubstituteGoodsPrice, PorkImport, BreedingEfficiency, MacroEnvironmentalIndicator
 } from '../types';
 
 interface MainChartsProps {
@@ -28,6 +29,10 @@ interface MainChartsProps {
   weeklyCapacityData: SwineCapacity[];
   dailyCapacityData: SwineCapacity[];
   companySalesData: CompanyMonthlySales[];
+  substitutePricesData: SubstituteGoodsPrice[];
+  porkImportsData: PorkImport[];
+  breedingEfficiencyData: BreedingEfficiency[];
+  macroEnvironmentalData: MacroEnvironmentalIndicator[];
   selectedSymbol: string;
   filterByTimeRange: <T extends { date: string }>(data: T[]) => T[];
 }
@@ -60,6 +65,10 @@ const MainCharts: React.FC<MainChartsProps> = ({
   weeklyCapacityData,
   dailyCapacityData,
   companySalesData,
+  substitutePricesData,
+  porkImportsData,
+  breedingEfficiencyData,
+  macroEnvironmentalData,
   selectedSymbol,
   filterByTimeRange
 }) => {
@@ -208,6 +217,11 @@ const MainCharts: React.FC<MainChartsProps> = ({
     const sorted = combined.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return filterByTimeRange(sorted);
   }, [companySalesData, capacityData, filterByTimeRange]);
+
+  const filteredSubstitute = React.useMemo(() => filterByTimeRange(substitutePricesData || []), [substitutePricesData, filterByTimeRange]);
+  const filteredImports = React.useMemo(() => filterByTimeRange(porkImportsData || []), [porkImportsData, filterByTimeRange]);
+  const filteredEfficiency = React.useMemo(() => filterByTimeRange(breedingEfficiencyData || []), [breedingEfficiencyData, filterByTimeRange]);
+  const filteredMacro = React.useMemo(() => filterByTimeRange(macroEnvironmentalData || []), [macroEnvironmentalData, filterByTimeRange]);
 
   if (activeChartTab === 'spot-futures') {
     return (
@@ -406,6 +420,104 @@ const MainCharts: React.FC<MainChartsProps> = ({
                 <Bar name="新希望" dataKey="newhope" stackId="listed" fill="var(--color-warn)" maxBarSize={20} />
                 <Line name="全国定点屠宰量" type="monotone" dataKey="nationalSlaughter" stroke="rgb(233, 30, 99)" strokeWidth={2.5} dot={{ r: 3 }} connectNulls />
               </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeChartTab === 'advanced-macro') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '16px', height: '100%', width: '100%' }}>
+        {/* Chart 1: Substitute Goods Prices */}
+        <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            替代蛋白现货均价走势 (元/公斤)
+          </div>
+          <div style={{ height: '320px', minHeight: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredSubstitute} margin={{ top: 10, right: 10, bottom: 5, left: -25 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis stroke="var(--text-muted)" fontSize={10} domain={['dataMin - 2', 'dataMax + 2']} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Line name="牛肉价格" type="monotone" dataKey="beef_price" stroke="var(--color-warn)" strokeWidth={2} dot={false} connectNulls />
+                <Line name="肉鸡价格" type="monotone" dataKey="chicken_price" stroke="var(--color-accent)" strokeWidth={2} dot={false} connectNulls />
+                <Line name="鸡蛋价格" type="monotone" dataKey="egg_price" stroke="var(--color-up)" strokeWidth={1.5} dot={false} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Chart 2: Pork Imports */}
+        <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            猪肉进口量及到岸价走势
+          </div>
+          <div style={{ height: '320px', minHeight: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={filteredImports} margin={{ top: 10, right: 10, bottom: 5, left: -25 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '进口量 (万吨)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} label={{ value: '到岸价 (元/公斤)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Bar yAxisId="left" name="进口量 (万吨)" dataKey="import_volume" fill="rgba(14, 165, 233, 0.4)" barSize={20} />
+                <Line yAxisId="right" name="进口均价 (元/公斤)" type="monotone" dataKey="import_price" stroke="var(--color-accent)" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Chart 3: Breeding Efficiency */}
+        <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            PSY/MSY 繁育效率及规模化占比
+          </div>
+          <div style={{ height: '320px', minHeight: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={filteredEfficiency} margin={{ top: 10, right: 10, bottom: 5, left: -25 }}>
+                <defs>
+                  <linearGradient id="colorScale" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} domain={['dataMin - 1', 'dataMax + 1']} label={{ value: 'PSY / MSY (头/年)', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} domain={[50, 100]} label={{ value: '规模养殖比重 (%)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Area yAxisId="right" name="规模养殖比重 (%)" type="monotone" dataKey="scale_farming_rate" fillOpacity={1} fill="url(#colorScale)" stroke="var(--color-accent)" strokeWidth={1} />
+                <Line yAxisId="left" name="PSY (母猪年断奶)" type="monotone" dataKey="psy" stroke="var(--color-up)" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                <Line yAxisId="left" name="MSY (母猪年出栏)" type="monotone" dataKey="msy" stroke="var(--color-warn)" strokeWidth={1.5} dot={false} connectNulls />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Chart 4: Macro Indicators */}
+        <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.03)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+            宏观经济景气与环保限制指数
+          </div>
+          <div style={{ height: '320px', minHeight: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredMacro} margin={{ top: 10, right: 10, bottom: 5, left: -25 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis yAxisId="left" stroke="var(--text-muted)" fontSize={10} label={{ value: '指数/比例', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="var(--text-muted)" fontSize={10} domain={[0, 10]} label={{ value: 'GDP增速 (%)', angle: 90, position: 'insideRight', fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={28} iconSize={12} style={{ fontSize: '0.75rem' }} />
+                <Line yAxisId="left" name="消费者信心指数" type="monotone" dataKey="consumer_confidence" stroke="var(--color-up)" strokeWidth={2} dot={false} connectNulls />
+                <Line yAxisId="left" name="环保管制强度指数" type="monotone" dataKey="environmental_regulation_index" stroke="var(--color-down)" strokeWidth={1.5} dot={false} connectNulls />
+                <Line yAxisId="right" name="GDP同比增速 (%)" type="monotone" dataKey="gdp_growth" stroke="var(--color-warn)" strokeWidth={2} dot={false} connectNulls />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

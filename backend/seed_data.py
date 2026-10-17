@@ -25,6 +25,10 @@ from backend.scraper import (
     fetch_logistics_safety,
     fetch_company_monthly_sales,
     fetch_downstream_demand,
+    fetch_substitute_prices,
+    fetch_pork_imports,
+    fetch_swine_efficiency,
+    fetch_macro_environmental_indicators,
 )
 
 
@@ -77,25 +81,35 @@ def run_seeding():
     print("\n10. Fetching real-time stock quotes...")
     fetch_live_stocks(db)
 
-    # 10b. Fetching listed companies monthly sales data... (Disabled - no real API)
-    # print("\n10b. Fetching listed companies monthly sales data...")
-    # fetch_company_monthly_sales(db)
+    # 10b. Fetching listed companies monthly sales data...
+    print("\n10b. Fetching listed companies monthly sales data...")
+    fetch_company_monthly_sales(db)
 
     # 11. Frozen pork storage data
     print("\n11. Fetching frozen pork reserves and storage capacity...")
     fetch_frozen_pork_storage(db)
 
-    # 12. Upstream supplies & alternative indicators (Disabled - no real API)
-    # print("\n12. Seeding biopharmaceutical procurement data...")
-    # fetch_biopharm_data(db)
-    # print("\n13. Seeding breeding consumables data...")
-    # fetch_consumables_data(db)
-    # print("\n14. Seeding feed sales breakdown data...")
-    # fetch_feed_breakdown(db)
-    # print("\n15. Seeding logistics & health safety data...")
-    # fetch_logistics_safety(db)
-    # print("\n16. Seeding pork downstream demand monitoring data...")
-    # fetch_downstream_demand(db)
+    # 12. Upstream supplies & alternative indicators
+    print("\n12. Seeding biopharmaceutical procurement data...")
+    fetch_biopharm_data(db)
+    print("\n13. Seeding breeding consumables data...")
+    fetch_consumables_data(db)
+    print("\n14. Seeding feed sales breakdown data...")
+    fetch_feed_breakdown(db)
+    print("\n15. Seeding logistics & health safety data...")
+    fetch_logistics_safety(db)
+    print("\n16. Seeding pork downstream demand monitoring data...")
+    fetch_downstream_demand(db)
+
+    # 17. New factors
+    print("\n17. Seeding substitute goods prices...")
+    fetch_substitute_prices(db)
+    print("\n18. Seeding pork imports...")
+    fetch_pork_imports(db)
+    print("\n19. Seeding breeding efficiency...")
+    fetch_swine_efficiency(db)
+    print("\n20. Seeding macro environmental indicators...")
+    fetch_macro_environmental_indicators(db)
 
     print("\n=================== Seeding Completed Successfully! ===================")
     db.close()

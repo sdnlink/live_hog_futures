@@ -13,6 +13,7 @@ import YijingPanel from './components/YijingPanel';
 import BottomDashboard from './components/BottomDashboard';
 import AnalysisReportPanel from './components/AnalysisReportPanel';
 import SentimentValidationPanel from './components/SentimentValidationPanel';
+import PriceTrendForecastPanel from './components/PriceTrendForecastPanel';
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('LH0');
@@ -29,6 +30,7 @@ function App() {
     epidemicReports,
     expertAdvice,
     yijingForecast,
+    priceTrendForecast,
     stockData,
     stockQuotes,
     companySalesData,
@@ -38,8 +40,13 @@ function App() {
     logisticsSafetyData,
     downstreamDemandData,
     sentimentIndex,
+    substitutePricesData,
+    porkImportsData,
+    breedingEfficiencyData,
+    macroEnvironmentalData,
     isLoading,
     isReportLoading,
+    isForecastLoading,
     isManualSyncing,
     isYijingLoading,
     lastSyncTime,
@@ -47,6 +54,7 @@ function App() {
     fetchRealtimeQuotes,
     fetchYijingForecast,
     fetchAnalysisReport,
+    fetchPriceTrendForecast,
     handleManualSync
   } = useAppData(selectedSymbol);
 
@@ -151,12 +159,97 @@ function App() {
 
   useEffect(() => { runCalculator(); }, [calcInputs, runCalculator]);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('hog_calculator_inputs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          setCalcInputs(prev => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load saved calculator inputs:', e);
+    }
+  }, []);
+
+  const saveCalculatorConfig = useCallback(() => {
+    try {
+      localStorage.setItem('hog_calculator_inputs', JSON.stringify(calcInputs));
+      alert('测算参数配置已成功保存到本地存储！');
+    } catch (e) {
+      alert('保存失败：' + e);
+    }
+  }, [calcInputs]);
+
+  const resetCalculatorConfig = useCallback(() => {
+    localStorage.removeItem('hog_calculator_inputs');
+    const latestCorn = (costsData && costsData.length > 0) ? costsData[costsData.length - 1].corn_price || 2420 : 2420;
+    const latestSoy = (costsData && costsData.length > 0) ? costsData[costsData.length - 1].soybean_price || 3500 : 3500;
+    const spot = expertAdvice?.spot_price || 15.0;
+    setCalcInputs({
+      outWeight: 120,
+      inWeight: 15,
+      pigletCost: Math.round(spot * 15 * 2),
+      cornPrice: latestCorn > 100 ? latestCorn : Math.round(latestCorn * 1000),
+      soyPrice: latestSoy > 100 ? latestSoy : Math.round(latestSoy * 1000),
+      wheatPrice: 2000,
+      addPrice: 6000,
+      fcr: 2.8,
+      labor: 80,
+      vaccine: 40,
+      utilities: 30,
+      depreciation: 50,
+      finance: 20,
+    });
+    alert('已恢复为标准行业基准测算参数！');
+  }, [costsData, expertAdvice]);
+
+  const exportCalculatorReport = useCallback(() => {
+    const reportText = [
+      '====================================================',
+      '        生猪养殖成本与头均利润测算报告 (DCE Terminal)',
+      '====================================================',
+      `测算时间: ${new Date().toLocaleString()}`,
+      `现货参考价: ${expertAdvice?.spot_price || 15.0} 元/公斤`,
+      '---------------- [ 生产与原材料输入 ] ----------------',
+      `出栏体重: ${calcInputs.outWeight} kg`,
+      `进栏体重: ${calcInputs.inWeight} kg`,
+      `增重总量: ${calcResults.weightGain} kg`,
+      `仔猪成本: ${calcInputs.pigletCost} 元/头`,
+      `料肉比(FCR): ${calcInputs.fcr}`,
+      `玉米价格: ${calcInputs.cornPrice} 元/吨`,
+      `豆粕价格: ${calcInputs.soyPrice} 元/吨`,
+      `其它成本(人工/防疫/折旧/财务): ${calcResults.otherCosts} 元/头`,
+      '---------------- [ 测算核心结论 ] ----------------',
+      `饲料折合单价: ${calcResults.feedCostPerKg} 元/kg`,
+      `总饲料成本: ${calcResults.totalFeedCost} 元/头`,
+      `养殖总成本: ${calcResults.totalCost} 元/头`,
+      `保本出栏价: ${calcResults.breakEven} 元/kg`,
+      `猪粮比价: ${calcResults.pigToGrain} : 1`,
+      `销售收入: ${calcResults.revenue} 元/头`,
+      `头均净利润: ${calcResults.profit >= 0 ? '+' : ''}${calcResults.profit} 元/头`,
+      '====================================================',
+    ].join('\n');
+
+    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `生猪养殖成本利润测算报告_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [calcInputs, calcResults, expertAdvice]);
+
   const handleSymbolSelect = (symbol: string) => {
     setSelectedSymbol(symbol);
     fetchKline(symbol);
     setTimeout(() => {
       fetchRealtimeQuotes();
       if (activeChartTab === 'yijing') fetchYijingForecast();
+      if (activeChartTab === 'price-forecast') fetchPriceTrendForecast();
     }, 0);
   };
 
@@ -227,7 +320,7 @@ function App() {
 
       {activePage === 'terminal' ? (
         <>
-          <KpiDashboard expertAdvice={expertAdvice} selectedSymbol={selectedSymbol} />
+          <KpiDashboard expertAdvice={expertAdvice} selectedSymbol={selectedSymbol} quotes={quotes} spotBasisData={spotBasisData} />
 
           <section className="main-dashboard-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -237,26 +330,34 @@ function App() {
             <article className="glass-panel" style={{ minWidth: 0 }}>
               <div className="panel-title-bar" style={{ marginBottom: '8px' }}>
                 <div className="chart-tabs-bar">
-                  {['analysis-report', 'sentiment-validation', 'spot-futures', 'basis', 'cost-profits', 'capacity', 'calculator', 'yijing'].map(tab => (
-                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''} ${tab === 'analysis-report' ? 'yijing-tab' : ''} ${tab === 'sentiment-validation' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); if (tab === 'analysis-report') fetchAnalysisReport(); }}>
+                  {['analysis-report', 'price-forecast', 'sentiment-validation', 'spot-futures', 'basis', 'cost-profits', 'capacity', 'advanced-macro', 'calculator', 'yijing'].map(tab => (
+                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''} ${tab === 'price-forecast' ? 'yijing-tab' : ''} ${tab === 'analysis-report' ? 'yijing-tab' : ''} ${tab === 'sentiment-validation' ? 'yijing-tab' : ''} ${tab === 'advanced-macro' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); if (tab === 'analysis-report') fetchAnalysisReport(); if (tab === 'price-forecast') fetchPriceTrendForecast(); }}>
                       <span>
                         {tab === 'analysis-report' ? '综合决策报告' :
+                         tab === 'price-forecast' ? '未来价格预测' :
                          tab === 'sentiment-validation' ? '舆情交叉印证' :
                          tab === 'spot-futures' ? '期现收敛' : 
                          tab === 'basis' ? '历史基差' : 
                          tab === 'cost-profits' ? '养殖成本利润' : 
                          tab === 'capacity' ? '生猪产能' : 
+                         tab === 'advanced-macro' ? '另类与宏观指标' :
                          tab === 'calculator' ? '成本计算器' : 
                          '易卦决策'}
                       </span>
                       {tab === 'yijing' && (
                         <span className="predict-badge yijing-badge">全预测</span>
                       )}
+                      {tab === 'price-forecast' && (
+                        <span className="predict-badge yijing-badge">量化推演</span>
+                      )}
                       {tab === 'analysis-report' && (
                         <span className="predict-badge yijing-badge">多维交叉</span>
                       )}
                       {tab === 'sentiment-validation' && (
                         <span className="predict-badge yijing-badge">前瞻舆情</span>
+                      )}
+                      {tab === 'advanced-macro' && (
+                        <span className="predict-badge yijing-badge">高级分析</span>
                       )}
                     </button>
                   ))}
@@ -272,18 +373,22 @@ function App() {
 
               <div className="chart-viewport" style={
                 activeChartTab === 'analysis-report' ? { height: 'auto', minHeight: '600px' } :
+                activeChartTab === 'price-forecast' ? { height: 'auto', minHeight: '800px' } :
                 activeChartTab === 'sentiment-validation' ? { height: 'auto', minHeight: '800px' } :
+                activeChartTab === 'advanced-macro' ? { height: 'auto', minHeight: '800px' } :
                 activeChartTab === 'capacity' ? { height: '1600px' } :
                 activeChartTab === 'yijing' ? { height: 'auto', minHeight: '1000px' } : 
                 activeChartTab === 'calculator' ? { height: 'auto', minHeight: '480px' } : 
                 undefined
               }>
-                {activeChartTab !== 'analysis-report' && (
+                {activeChartTab !== 'analysis-report' && activeChartTab !== 'price-forecast' && (
                   <MainCharts 
                     activeChartTab={activeChartTab} spotBasisData={spotBasisData} klineData={klineData}
                     porkPriceData={porkPriceData} costsData={costsData} capacityData={capacityData}
                     weeklyCapacityData={weeklyCapacityData} dailyCapacityData={dailyCapacityData}
                     companySalesData={companySalesData}
+                    substitutePricesData={substitutePricesData} porkImportsData={porkImportsData}
+                    breedingEfficiencyData={breedingEfficiencyData} macroEnvironmentalData={macroEnvironmentalData}
                     selectedSymbol={selectedSymbol} filterByTimeRange={filterByTimeRange}
                   />
                 )}
@@ -294,11 +399,21 @@ function App() {
                     onRefresh={fetchAnalysisReport}
                   />
                 )}
+                {activeChartTab === 'price-forecast' && (
+                  <PriceTrendForecastPanel
+                    forecastData={priceTrendForecast}
+                    isLoading={isForecastLoading}
+                    onRefresh={fetchPriceTrendForecast}
+                    selectedSymbol={selectedSymbol}
+                  />
+                )}
                 {activeChartTab === 'calculator' && (
                   <BreedingCalculator 
                     calcInputs={calcInputs} calcResults={calcResults} 
                     handleInputChange={(f,v)=>setCalcInputs(p=>({...p,[f]:v}))}
-                    saveCalculatorConfig={() => {}} exportCalculatorReport={() => {}} resetCalculatorConfig={() => {}}
+                    saveCalculatorConfig={saveCalculatorConfig} 
+                    exportCalculatorReport={exportCalculatorReport} 
+                    resetCalculatorConfig={resetCalculatorConfig}
                   />
                 )}
                 {activeChartTab === 'yijing' && (

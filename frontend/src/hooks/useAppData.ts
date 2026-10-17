@@ -19,7 +19,13 @@ import type {
   BreedingConsumable,
   FeedSalesBreakdown,
   HogLogisticsSafety,
-  PorkDownstreamDemand
+  PorkDownstreamDemand,
+  SubstituteGoodsPrice,
+  PorkImport,
+  BreedingEfficiency,
+  MacroEnvironmentalIndicator,
+  PriceTrendForecast,
+  SimulationParams
 } from '../types';
 
 const BASE_URL = '/sys1';
@@ -41,6 +47,7 @@ export const useAppData = (selectedSymbol: string) => {
   const [expertAdvice, setExpertAdvice] = useState<ExpertAdvice | null>(null);
   const [yijingForecast, setYijingForecast] = useState<YijingForecast | null>(null);
   const [analysisReportData, setAnalysisReportData] = useState<AnalysisReportResponse | null>(null);
+  const [priceTrendForecast, setPriceTrendForecast] = useState<PriceTrendForecast | null>(null);
   
   const [stockData, setStockData] = useState<StockKline[]>([]);
   const [stockQuotes, setStockQuotes] = useState<StockQuote[]>([]);
@@ -52,12 +59,18 @@ export const useAppData = (selectedSymbol: string) => {
   const [logisticsSafetyData, setHogLogisticsSafety] = useState<HogLogisticsSafety[]>([]);
   const [downstreamDemandData, setPorkDownstreamDemand] = useState<PorkDownstreamDemand[]>([]);
 
+  const [substitutePricesData, setSubstitutePricesData] = useState<SubstituteGoodsPrice[]>([]);
+  const [porkImportsData, setPorkImportsData] = useState<PorkImport[]>([]);
+  const [breedingEfficiencyData, setBreedingEfficiencyData] = useState<BreedingEfficiency[]>([]);
+  const [macroEnvironmentalData, setMacroEnvironmentalData] = useState<MacroEnvironmentalIndicator[]>([]);
+
   // Status States
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRealtimePolling, setIsRealtimePolling] = useState<boolean>(false);
   const [isManualSyncing, setIsManualSyncing] = useState<boolean>(false);
   const [isYijingLoading, setIsYijingLoading] = useState<boolean>(false);
   const [isReportLoading, setIsReportLoading] = useState<boolean>(false);
+  const [isForecastLoading, setIsForecastLoading] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [nextRefreshSec, setNextRefreshSec] = useState<number>(0);
@@ -71,7 +84,7 @@ export const useAppData = (selectedSymbol: string) => {
   const fetchStaticData = useCallback(async () => {
     try {
       setErrorMsg('');
-      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, companySalesRes, biopharmRes, consumablesRes, feedRes, logisticsRes, demandRes] = await Promise.all([
+      const [spotRes, provRes, capRes, weeklyCapRes, dailyCapRes, costRes, epiRes, porkRes, stockRes, companySalesRes, biopharmRes, consumablesRes, feedRes, logisticsRes, demandRes, subRes, importRes, effRes, macroRes] = await Promise.all([
         fetch(`${BASE_URL}/api/spot/basis`),
         fetch(`${BASE_URL}/api/spot/provincial`),
         fetch(`${BASE_URL}/api/fundamentals/capacity?granularity=monthly`),
@@ -87,9 +100,13 @@ export const useAppData = (selectedSymbol: string) => {
         fetch(`${BASE_URL}/api/fundamentals/feed_breakdown`),
         fetch(`${BASE_URL}/api/fundamentals/logistics_safety`),
         fetch(`${BASE_URL}/api/fundamentals/downstream_demand`),
+        fetch(`${BASE_URL}/api/fundamentals/substitute_prices`),
+        fetch(`${BASE_URL}/api/fundamentals/pork_imports`),
+        fetch(`${BASE_URL}/api/fundamentals/breeding_efficiency`),
+        fetch(`${BASE_URL}/api/fundamentals/macro_environmental`),
       ]);
 
-      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !companySalesRes.ok || !biopharmRes.ok || !consumablesRes.ok || !feedRes.ok || !logisticsRes.ok || !demandRes.ok) {
+      if (!spotRes.ok || !provRes.ok || !capRes.ok || !weeklyCapRes.ok || !dailyCapRes.ok || !costRes.ok || !epiRes.ok || !porkRes.ok || !stockRes.ok || !companySalesRes.ok || !biopharmRes.ok || !consumablesRes.ok || !feedRes.ok || !logisticsRes.ok || !demandRes.ok || !subRes.ok || !importRes.ok || !effRes.ok || !macroRes.ok) {
         throw new Error('Failed to retrieve macro fundamental data from backend.');
       }
 
@@ -110,6 +127,10 @@ export const useAppData = (selectedSymbol: string) => {
       setFeedBreakdownData(await feedRes.json());
       setHogLogisticsSafety(await logisticsRes.json());
       setPorkDownstreamDemand(await demandRes.json());
+      setSubstitutePricesData(await subRes.json());
+      setPorkImportsData(await importRes.json());
+      setBreedingEfficiencyData(await effRes.json());
+      setMacroEnvironmentalData(await macroRes.json());
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || '网络连接异常，未能获取基本面数据');
@@ -176,6 +197,27 @@ export const useAppData = (selectedSymbol: string) => {
     }
   }, []);
 
+  const fetchPriceTrendForecast = useCallback(async (simParams?: Partial<SimulationParams>) => {
+    try {
+      setIsForecastLoading(true);
+      const symbol = selectedSymbolRef.current;
+      let url = `${BASE_URL}/api/forecast/price_trend?symbol=${symbol}`;
+      if (simParams) {
+        if (simParams.sow_shock_pct !== undefined) url += `&sow_shock_pct=${simParams.sow_shock_pct}`;
+        if (simParams.feed_cost_shock_pct !== undefined) url += `&feed_cost_shock_pct=${simParams.feed_cost_shock_pct}`;
+        if (simParams.weight_shock_kg !== undefined) url += `&weight_shock_kg=${simParams.weight_shock_kg}`;
+        if (simParams.demand_shock_pct !== undefined) url += `&demand_shock_pct=${simParams.demand_shock_pct}`;
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('量化价格走势预测接口请求失败');
+      setPriceTrendForecast(await res.json());
+    } catch (err) {
+      console.error('Fetch price trend forecast error:', err);
+    } finally {
+      setIsForecastLoading(false);
+    }
+  }, []);
+
   const handleManualSync = async () => {
     try {
       setIsManualSyncing(true);
@@ -187,7 +229,8 @@ export const useAppData = (selectedSymbol: string) => {
         fetchRealtimeQuotes(),
         fetchKline(selectedSymbolRef.current),
         fetchYijingForecast(),
-        fetchAnalysisReport()
+        fetchAnalysisReport(),
+        fetchPriceTrendForecast()
       ]);
       alert('所有基本面数据同步完成！');
     } catch (err: any) {
@@ -206,7 +249,8 @@ export const useAppData = (selectedSymbol: string) => {
         fetchRealtimeQuotes(),
         fetchKline(selectedSymbolRef.current),
         fetchYijingForecast(),
-        fetchAnalysisReport()
+        fetchAnalysisReport(),
+        fetchPriceTrendForecast()
       ]);
       setIsLoading(false);
     };
@@ -228,6 +272,7 @@ export const useAppData = (selectedSymbol: string) => {
             fetchKline(selectedSymbolRef.current);
             fetchYijingForecast();
             fetchAnalysisReport();
+            fetchPriceTrendForecast();
           }, 0);
           const newInterval = pickRandomInterval();
           return newInterval;
@@ -237,7 +282,7 @@ export const useAppData = (selectedSymbol: string) => {
     }, TICK_SEC * 1000);
 
     return () => clearInterval(timer);
-  }, [fetchStaticData, fetchRealtimeQuotes, fetchKline, fetchYijingForecast]);
+  }, [fetchStaticData, fetchRealtimeQuotes, fetchKline, fetchYijingForecast, fetchAnalysisReport, fetchPriceTrendForecast]);
 
   return {
     quotes,
@@ -253,6 +298,7 @@ export const useAppData = (selectedSymbol: string) => {
     sentimentIndex,
     expertAdvice,
     yijingForecast,
+    priceTrendForecast,
     stockData,
     stockQuotes,
     companySalesData,
@@ -262,11 +308,16 @@ export const useAppData = (selectedSymbol: string) => {
     feedBreakdownData,
     logisticsSafetyData,
     downstreamDemandData,
+    substitutePricesData,
+    porkImportsData,
+    breedingEfficiencyData,
+    macroEnvironmentalData,
     isLoading,
     isRealtimePolling,
     isManualSyncing,
     isYijingLoading,
     isReportLoading,
+    isForecastLoading,
     lastSyncTime,
     errorMsg,
     nextRefreshSec,
@@ -274,6 +325,7 @@ export const useAppData = (selectedSymbol: string) => {
     fetchRealtimeQuotes,
     fetchYijingForecast,
     fetchAnalysisReport,
+    fetchPriceTrendForecast,
     handleManualSync
   };
 };

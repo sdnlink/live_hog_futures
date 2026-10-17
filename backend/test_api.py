@@ -7,7 +7,7 @@ import sys
 BASE_URL = "http://localhost:8000"
 
 
-def test_endpoint(path, method="GET", params=None, json_data=None):
+def request_endpoint(path, method="GET", params=None, json_data=None):
     url = f"{BASE_URL}{path}"
     print(f"Testing {method} {url} ... ", end="")
     try:
@@ -150,6 +150,30 @@ def main():
             "method": "GET",
             "validate": lambda data: isinstance(data, list),
         },
+        # 17c. Substitute goods prices
+        {
+            "path": "/api/fundamentals/substitute_prices",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, list),
+        },
+        # 17d. Pork imports
+        {
+            "path": "/api/fundamentals/pork_imports",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, list),
+        },
+        # 17e. Breeding efficiency
+        {
+            "path": "/api/fundamentals/breeding_efficiency",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, list),
+        },
+        # 17f. Macro environmental indicators
+        {
+            "path": "/api/fundamentals/macro_environmental",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, list),
+        },
         # 18. Expert advice
         {
             "path": "/api/expert/advice",
@@ -167,7 +191,26 @@ def main():
             and "direction" in data
             and "meihua" in data,
         },
-        # 20. Sync all
+        # 20. Quantitative price trend forecast
+        {
+            "path": "/api/forecast/price_trend",
+            "method": "GET",
+            "params": {"symbol": "LH0"},
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "horizons" in data
+            and "trajectory_90d" in data,
+        },
+        # 21. Multi-dimensional analysis report
+        {
+            "path": "/api/analysis/report",
+            "method": "GET",
+            "params": {"symbol": "LH0"},
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "executive_summary" in data,
+        },
+        # 22. Sync all
         {
             "path": "/api/sync/all",
             "method": "POST",
@@ -183,7 +226,7 @@ def main():
     for t in tests:
         params = t.get("params")
         json_data = t.get("json_data")
-        data, ok = test_endpoint(
+        data, ok = request_endpoint(
             t["path"], method=t["method"], params=params, json_data=json_data
         )
 

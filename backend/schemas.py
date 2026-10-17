@@ -1,9 +1,13 @@
-from pydantic import BaseModel
-from datetime import date, datetime
+from pydantic import BaseModel, ConfigDict
+from datetime import date, datetime, date as dt_date
 from typing import List, Optional, Dict, Any
 
 
-class FuturesQuoteOut(BaseModel):
+class OrmBaseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FuturesQuoteOut(OrmBaseModel):
     id: int
     symbol: str
     name: str
@@ -22,11 +26,8 @@ class FuturesQuoteOut(BaseModel):
     time: str
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
 
-
-class FuturesKlineOut(BaseModel):
+class FuturesKlineOut(OrmBaseModel):
     id: int
     symbol: str
     date: date
@@ -38,45 +39,33 @@ class FuturesKlineOut(BaseModel):
     open_interest: float
     settlement: float
 
-    class Config:
-        from_attributes = True
 
-
-class SpotPriceOut(BaseModel):
+class SpotPriceOut(OrmBaseModel):
     id: int
     date: date
     price: float
     basis: Optional[float] = None
 
-    class Config:
-        from_attributes = True
 
-
-class ProvincialPriceOut(BaseModel):
+class ProvincialPriceOut(OrmBaseModel):
     id: int
     date: date
     province: str
     price: float
     change: float
 
-    class Config:
-        from_attributes = True
 
-
-class BreedingIndicatorOut(BaseModel):
+class BreedingIndicatorOut(OrmBaseModel):
     id: int
     date: date
-    corn_price: float
-    soybean_price: float
-    pig_to_grain_ratio: float
-    self_breeding_profit: float
-    piglet_breeding_profit: float
-
-    class Config:
-        from_attributes = True
+    corn_price: Optional[float] = None
+    soybean_price: Optional[float] = None
+    pig_to_grain_ratio: Optional[float] = None
+    self_breeding_profit: Optional[float] = None
+    piglet_breeding_profit: Optional[float] = None
 
 
-class SwineCapacityOut(BaseModel):
+class SwineCapacityOut(OrmBaseModel):
     id: int
     date: date
     maternal_sow_inventory: Optional[float] = None
@@ -86,22 +75,15 @@ class SwineCapacityOut(BaseModel):
     pork_consumption: Optional[float] = None
     slaughterhouse_volume: Optional[float] = None
     slaughterhouse_operating_rate: Optional[float] = None
-    average_market_weight: Optional[float] = None
-
-    class Config:
-        from_attributes = True
 
 
-class PorkPriceOut(BaseModel):
+class PorkPriceOut(OrmBaseModel):
     id: int
     date: date
     price: float
 
-    class Config:
-        from_attributes = True
 
-
-class EpidemicReportOut(BaseModel):
+class EpidemicReportOut(OrmBaseModel):
     id: int
     date: date
     title: str
@@ -110,37 +92,16 @@ class EpidemicReportOut(BaseModel):
     level: str
     url: Optional[str] = None
 
-    class Config:
-        from_attributes = True
 
-
-class SentimentIndexOut(BaseModel):
+class SentimentIndexOut(OrmBaseModel):
     id: int
     date: date
     keyword: str
     frequency: int
     sentiment_score: float
 
-    class Config:
-        from_attributes = True
 
-
-class ExpertAdviceOut(BaseModel):
-    status: str
-    date: date
-    spot_price: float
-    futures_price: float
-    basis: float
-    pig_to_grain: float
-    self_breeding_profit: float
-    piglet_breeding_profit: float
-    average_weight: float
-    warning_level: str
-    conclusion: Dict[str, Any]
-    advice: Dict[str, Any]
-
-
-class StockKlineOut(BaseModel):
+class StockKlineOut(OrmBaseModel):
     id: int
     symbol: str
     name: str
@@ -151,11 +112,8 @@ class StockKlineOut(BaseModel):
     close: float
     volume: float
 
-    class Config:
-        from_attributes = True
 
-
-class StockQuoteOut(BaseModel):
+class StockQuoteOut(OrmBaseModel):
     id: int
     symbol: str
     name: str
@@ -170,22 +128,16 @@ class StockQuoteOut(BaseModel):
     time: str
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
 
-
-class FrozenPorkStorageOut(BaseModel):
+class FrozenPorkStorageOut(OrmBaseModel):
     id: int
     date: date
     reserve_volume: Optional[float] = None
     commercial_inventory: Optional[float] = None
     storage_rate: Optional[float] = None
 
-    class Config:
-        from_attributes = True
 
-
-class BiopharmaceuticalProcurementOut(BaseModel):
+class BiopharmaceuticalProcurementOut(OrmBaseModel):
     id: int
     date: date
     swine_fever_vaccine: Optional[float] = None
@@ -196,11 +148,8 @@ class BiopharmaceuticalProcurementOut(BaseModel):
     oxytocin_sales: Optional[float] = None
     vaccine_index: Optional[float] = None
 
-    class Config:
-        from_attributes = True
 
-
-class BreedingConsumableConsumptionOut(BaseModel):
+class BreedingConsumableConsumptionOut(OrmBaseModel):
     id: int
     date: date
     insemination_catheters: Optional[float] = None
@@ -209,11 +158,8 @@ class BreedingConsumableConsumptionOut(BaseModel):
     iron_injection: Optional[float] = None
     ear_tags: Optional[float] = None
 
-    class Config:
-        from_attributes = True
 
-
-class FeedSalesBreakdownOut(BaseModel):
+class FeedSalesBreakdownOut(OrmBaseModel):
     id: int
     date: date
     sow_feed: Optional[float] = None
@@ -222,22 +168,16 @@ class FeedSalesBreakdownOut(BaseModel):
     finisher_feed: Optional[float] = None
     overall_feed_volume: Optional[float] = None
 
-    class Config:
-        from_attributes = True
 
-
-class HogLogisticsAndSafetyOut(BaseModel):
+class HogLogisticsAndSafetyOut(OrmBaseModel):
     id: int
     date: date
     quarantine_certificates: Optional[int] = None
     transport_freight_index: Optional[float] = None
     mortality_waste_disposal: Optional[float] = None
 
-    class Config:
-        from_attributes = True
 
-
-class CompanyMonthlySalesOut(BaseModel):
+class CompanyMonthlySalesOut(OrmBaseModel):
     id: int
     symbol: str
     name: str
@@ -246,8 +186,84 @@ class CompanyMonthlySalesOut(BaseModel):
     sales_price: Optional[float] = None
     sales_revenue: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+
+class PorkDownstreamDemandOut(OrmBaseModel):
+    id: int
+    date: date
+    pork_production: Optional[float] = None
+    pork_consumption: Optional[float] = None
+    feed_supply: Optional[float] = None
+    processed_pork_demand: Optional[float] = None
+    catering_pork_demand: Optional[float] = None
+
+
+class SubstituteGoodsPriceOut(OrmBaseModel):
+    id: int
+    date: date
+    beef_price: Optional[float] = None
+    chicken_price: Optional[float] = None
+    egg_price: Optional[float] = None
+
+
+class PorkImportOut(OrmBaseModel):
+    id: int
+    date: date
+    import_volume: Optional[float] = None
+    import_price: Optional[float] = None
+
+
+class BreedingEfficiencyOut(OrmBaseModel):
+    id: int
+    date: date
+    psy: Optional[float] = None
+    msy: Optional[float] = None
+    scale_farming_rate: Optional[float] = None
+
+
+class MacroEnvironmentalIndicatorOut(OrmBaseModel):
+    id: int
+    date: date
+    consumer_confidence: Optional[float] = None
+    environmental_regulation_index: Optional[float] = None
+    gdp_growth: Optional[float] = None
+
+
+# Advice and analysis models
+class GroupAdvice(BaseModel):
+    title: str
+    action: str
+    bullets: List[str] = []
+    logic: Optional[str] = None
+    tips: Optional[List[str]] = None
+
+
+class RadarScores(BaseModel):
+    supply: int
+    demand: int
+    cost: int
+    policy: int
+    disease: int
+
+
+class ConclusionOut(BaseModel):
+    title: str
+    description: str
+    radar: RadarScores
+
+
+class ExpertAdviceOut(BaseModel):
+    status: str
+    date: Optional[dt_date] = None
+    spot_price: float
+    futures_price: float
+    basis: float
+    pig_to_grain: Optional[float] = None
+    self_breeding_profit: Optional[float] = None
+    piglet_breeding_profit: Optional[float] = None
+    average_weight: Optional[float] = None
+    warning_level: str
+    conclusion: ConclusionOut
+    advice: Dict[str, GroupAdvice]
 
 
 class EpidemicStatusOut(BaseModel):
@@ -368,14 +384,77 @@ class AnalysisReportResponse(BaseModel):
     narrative: str
 
 
-class PorkDownstreamDemandOut(BaseModel):
-    id: int
-    date: date
-    pork_production: Optional[float] = None
-    pork_consumption: Optional[float] = None
-    feed_supply: Optional[float] = None
-    processed_pork_demand: Optional[float] = None
-    catering_pork_demand: Optional[float] = None
+# --- Quantitative Price Forecasting Schemas (New) ---
 
-    class Config:
-        from_attributes = True
+class TrajectoryPointOut(BaseModel):
+    date: str
+    days_ahead: int
+    price_mid: float
+    price_upper: float
+    price_lower: float
+    projected_basis: float
+
+
+class HorizonDetailOut(BaseModel):
+    horizon: str  # e.g. "1d", "3d", "5d", "7d", "10d", "15d", "30d", "60d", "90d", "180d"
+    target_date: str
+    days: int
+    mid: float
+    high: float
+    low: float
+    direction: str
+    direction_class: str
+    confidence: float
+    expected_change_pct: float
+    primary_driver: str
+
+
+class BiologicalCohortSupplyOut(BaseModel):
+    reference_date: str
+    sow_t_minus_10: float  # 万头
+    piglets_t_minus_6: float  # 万头
+    projected_slaughter_heads: float  # 万头
+    projected_avg_weight: float  # 公斤
+    projected_pork_supply: float  # 万吨
+    normal_demand: float  # 万吨
+    supply_demand_gap_pct: float  # % (正值代表过剩，负值代表短缺)
+    phase_assessment: str
+
+
+class CostAnalysisSummaryOut(BaseModel):
+    corn_price: float  # 元/吨
+    soybean_price: float  # 元/吨
+    feed_price_per_kg: float  # 元/公斤
+    feed_cost_per_kg_gain: float  # 元/公斤增重成本
+    piglet_cost_share: float  # 元/公斤仔猪分摊
+    cash_cost_line: float  # 现金保本线 (元/公斤)
+    full_cost_line: float  # 完全保本线 (元/公斤)
+    current_margin: float  # 当前毛利 (元/公斤)
+    safety_margin_pct: float  # 相对完全成本的安全溢价/折价 (%)
+
+
+class DriversDecompositionOut(BaseModel):
+    supply_gap_impact: float  # 供需缺口对价格的影响贡献分
+    cost_support_impact: float  # 成本中枢对价格的支撑/压制贡献分
+    seasonality_impact: float  # 消费季节性系数影响分
+    basis_convergence_impact: float  # 基差回归驱动分
+    speculation_weight_impact: float  # 二育与压栏行为影响分
+
+
+class PriceTrendForecastResponse(BaseModel):
+    status: str
+    symbol: str
+    base_date: str
+    spot_price: float
+    futures_price: float
+    basis: float
+    short_term_bias: str
+    mid_term_bias: str
+    long_term_bias: str
+    overall_confidence: float
+    horizons: List[HorizonDetailOut]
+    trajectory_90d: List[TrajectoryPointOut]
+    cohort: BiologicalCohortSupplyOut
+    cost: CostAnalysisSummaryOut
+    drivers: DriversDecompositionOut
+    forecast_narrative: str

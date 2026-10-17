@@ -266,3 +266,51 @@ class PorkDownstreamDemand(Base):
     feed_supply = Column(Float, nullable=True)  # 饲料实际供给量 (万吨)
     processed_pork_demand = Column(Float, nullable=True)  # 猪肉深加工制品需求量 (万吨)
     catering_pork_demand = Column(Float, nullable=True)  # 餐饮与商用肉类需求量 (万吨)
+
+
+class SubstituteGoodsPrice(Base):
+    """替代品现货价格监控表（牛肉、白条鸡、鸡蛋价格，元/公斤）"""
+
+    __tablename__ = "substitute_goods_prices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    beef_price = Column(Float, nullable=True)     # 牛肉价格 (元/公斤)
+    chicken_price = Column(Float, nullable=True)  # 肉鸡/白条鸡价格 (元/公斤)
+    egg_price = Column(Float, nullable=True)      # 鸡蛋价格 (元/公斤)
+
+
+class PorkImport(Base):
+    """猪肉进口情况监控表"""
+
+    __tablename__ = "pork_imports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)      # 月度月末日期
+    import_volume = Column(Float, nullable=True)      # 进口量 (万吨)
+    import_price = Column(Float, nullable=True)       # 进口均价 (元/公斤)
+
+
+class BreedingEfficiency(Base):
+    """繁育效率与产业规模化占比监控表"""
+
+    __tablename__ = "breeding_efficiency"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    psy = Column(Float, nullable=True)                 # PSY (头/年)
+    msy = Column(Float, nullable=True)                 # MSY (头/年)
+    scale_farming_rate = Column(Float, nullable=True)  # 规模化养殖比重 (%)
+
+
+class MacroEnvironmentalIndicator(Base):
+    """宏观与环保强度指标监控表"""
+
+    __tablename__ = "macro_environmental_indicators"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    consumer_confidence = Column(Float, nullable=True)          # 消费者信心指数
+    environmental_regulation_index = Column(Float, nullable=True) # 环保监管强度指数
+    gdp_growth = Column(Float, nullable=True)                   # GDP当季同比增速 (%)
+

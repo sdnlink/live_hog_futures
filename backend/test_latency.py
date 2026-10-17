@@ -8,7 +8,7 @@ import sys
 BASE_URL = "http://localhost:8000"
 
 
-def test_latency(path, method="GET", params=None, json_data=None):
+def measure_latency(path, method="GET", params=None, json_data=None):
     url = f"{BASE_URL}{path}"
     start_time = time.perf_counter()
     try:
@@ -111,7 +111,7 @@ def main():
     for idx, t in enumerate(tests, 1):
         params = t.get("params")
         json_data = t.get("json_data")
-        status, latency, ok = test_latency(
+        status, latency, ok = measure_latency(
             t["path"], method=t["method"], params=params, json_data=json_data
         )
 

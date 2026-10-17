@@ -1,65 +1,92 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Award, LineChart as ChartIcon, Layers, ShieldCheck, Calculator } from 'lucide-react';
-import type { ExpertAdvice } from '../types';
+import type { ExpertAdvice, FuturesQuote, SpotPrice } from '../types';
 
 interface KpiDashboardProps {
   expertAdvice: ExpertAdvice | null;
   selectedSymbol: string;
+  quotes?: FuturesQuote[];
+  spotBasisData?: SpotPrice[];
 }
 
-const KpiDashboard: React.FC<KpiDashboardProps> = ({ expertAdvice, selectedSymbol }) => {
+const KpiDashboard: React.FC<KpiDashboardProps> = ({ expertAdvice, selectedSymbol, quotes, spotBasisData }) => {
+  const spotChangeInfo = React.useMemo(() => {
+    if (!spotBasisData || spotBasisData.length < 2) {
+      return { changePct: 0, isUp: true };
+    }
+    const sorted = [...spotBasisData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const latest = sorted[sorted.length - 1]?.price || 0;
+    const prev = sorted[sorted.length - 2]?.price || 0;
+    if (prev <= 0) return { changePct: 0, isUp: true };
+    const pct = ((latest - prev) / prev) * 100;
+    return { changePct: pct, isUp: pct >= 0 };
+  }, [spotBasisData]);
+
+  const futuresChangeInfo = React.useMemo(() => {
+    if (!quotes || quotes.length === 0) return { changePct: 0, isUp: true };
+    const activeQuote = quotes.find(q => q.symbol === selectedSymbol) || quotes.find(q => q.symbol === 'LH0');
+    if (!activeQuote || activeQuote.yesterday_close <= 0) return { changePct: 0, isUp: true };
+    const pct = ((activeQuote.last_price - activeQuote.yesterday_close) / activeQuote.yesterday_close) * 100;
+    return { changePct: pct, isUp: pct >= 0 };
+  }, [quotes, selectedSymbol]);
+
+  const currentBasis = expertAdvice?.basis || 0;
+  const isBasisPositive = currentBasis >= 0;
+
   return (
     <section className="kpi-container">
       {/* KPI 1: Spot Price */}
-      <div className="glass-panel kpi-card up">
+      <div className={`glass-panel kpi-card ${spotChangeInfo.isUp ? 'up' : 'down'}`}>
         <div className="kpi-header">
           <span>全国生猪现货均价</span>
           <Award className="kpi-icon" size={14} />
         </div>
-        <div className="kpi-value mono" style={{ color: 'var(--color-up)' }}>
+        <div className="kpi-value mono" style={{ color: spotChangeInfo.isUp ? 'var(--color-up)' : 'var(--color-down)' }}>
           {expertAdvice?.spot_price ? `${expertAdvice.spot_price.toFixed(2)}` : '15.40'}
           <span style={{ fontSize: '0.8rem', marginLeft: '4px', fontWeight: 500 }}>元/公斤</span>
         </div>
         <div className="kpi-footer">
-          <span className="trend-badge up">
-            <TrendingUp size={11} />
-            +2.15%
+          <span className={`trend-badge ${spotChangeInfo.isUp ? 'up' : 'down'}`}>
+            {spotChangeInfo.isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+            {spotChangeInfo.isUp ? '+' : ''}{spotChangeInfo.changePct.toFixed(2)}%
           </span>
-          <span style={{ color: 'var(--text-muted)' }}>较昨日均价</span>
+          <span style={{ color: 'var(--text-muted)' }}>较前一日均价</span>
         </div>
       </div>
 
       {/* KPI 2: Futures Contract Price */}
-      <div className="glass-panel kpi-card down">
+      <div className={`glass-panel kpi-card ${futuresChangeInfo.isUp ? 'up' : 'down'}`}>
         <div className="kpi-header">
-          <span>期货价格 ({selectedSymbol})</span>
+          <span>期货盘面 ({selectedSymbol})</span>
           <ChartIcon className="kpi-icon" size={14} />
         </div>
-        <div className="kpi-value mono" style={{ color: 'var(--color-down)' }}>
+        <div className="kpi-value mono" style={{ color: futuresChangeInfo.isUp ? 'var(--color-up)' : 'var(--color-down)' }}>
           {expertAdvice?.futures_price ? `${Math.round(expertAdvice.futures_price)}` : '12080'}
           <span style={{ fontSize: '0.8rem', marginLeft: '4px', fontWeight: 500 }}>元/吨</span>
         </div>
         <div className="kpi-footer">
-          <span className="trend-badge down">
-            <TrendingDown size={11} />
-            -0.58%
+          <span className={`trend-badge ${futuresChangeInfo.isUp ? 'up' : 'down'}`}>
+            {futuresChangeInfo.isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+            {futuresChangeInfo.isUp ? '+' : ''}{futuresChangeInfo.changePct.toFixed(2)}%
           </span>
           <span style={{ color: 'var(--text-muted)' }}>24小时涨跌</span>
         </div>
       </div>
 
       {/* KPI 3: Basis (Spot - Futures) */}
-      <div className="glass-panel kpi-card warn">
+      <div className={`glass-panel kpi-card ${isBasisPositive ? 'up' : 'warn'}`}>
         <div className="kpi-header">
           <span>即期生猪基差</span>
           <Layers className="kpi-icon" size={14} />
         </div>
-        <div className="kpi-value mono" style={{ color: 'var(--color-warn)' }}>
+        <div className="kpi-value mono" style={{ color: isBasisPositive ? 'var(--color-up)' : 'var(--color-down)' }}>
           {expertAdvice?.basis ? `${Math.round(expertAdvice.basis)}` : '-2640'}
           <span style={{ fontSize: '0.8rem', marginLeft: '4px', fontWeight: 500 }}>元/吨</span>
         </div>
         <div className="kpi-footer">
-          <span style={{ color: 'var(--text-muted)' }}>期现折算价架收敛度</span>
+          <span style={{ color: isBasisPositive ? 'var(--color-up)' : 'var(--text-muted)' }}>
+            {isBasisPositive ? '现货升水 (+强现实)' : '现货贴水 (-预期升水)'}
+          </span>
         </div>
       </div>
 

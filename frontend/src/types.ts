@@ -323,3 +323,115 @@ export interface PorkDownstreamDemand {
   processed_pork_demand: number | null;
   catering_pork_demand: number | null;
 }
+
+export interface SubstituteGoodsPrice {
+  id: number;
+  date: string;
+  beef_price: number | null;
+  chicken_price: number | null;
+  egg_price: number | null;
+}
+
+export interface PorkImport {
+  id: number;
+  date: string;
+  import_volume: number | null;
+  import_price: number | null;
+}
+
+export interface BreedingEfficiency {
+  id: number;
+  date: string;
+  psy: number | null;
+  msy: number | null;
+  scale_farming_rate: number | null;
+}
+
+export interface MacroEnvironmentalIndicator {
+  id: number;
+  date: string;
+  consumer_confidence: number | null;
+  environmental_regulation_index: number | null;
+  gdp_growth: number | null;
+}
+
+export interface TrajectoryPoint {
+  date: string;
+  days_ahead: number;
+  price_mid: number;
+  price_upper: number;
+  price_lower: number;
+  projected_basis: number;
+}
+
+export interface HorizonDetail {
+  horizon: string;
+  target_date: string;
+  days: number;
+  mid: number;
+  high: number;
+  low: number;
+  direction: string;
+  direction_class: string;
+  confidence: number;
+  expected_change_pct: number;
+  primary_driver: string;
+}
+
+export interface BiologicalCohortSupply {
+  reference_date: string;
+  sow_t_minus_10: number;
+  piglets_t_minus_6: number;
+  projected_slaughter_heads: number;
+  projected_avg_weight: number;
+  projected_pork_supply: number;
+  normal_demand: number;
+  supply_demand_gap_pct: number;
+  phase_assessment: string;
+}
+
+export interface CostAnalysisSummary {
+  corn_price: number;
+  soybean_price: number;
+  feed_price_per_kg: number;
+  feed_cost_per_kg_gain: number;
+  piglet_cost_share: number;
+  cash_cost_line: number;
+  full_cost_line: number;
+  current_margin: number;
+  safety_margin_pct: number;
+}
+
+export interface DriversDecomposition {
+  supply_gap_impact: number;
+  cost_support_impact: number;
+  seasonality_impact: number;
+  basis_convergence_impact: number;
+  speculation_weight_impact: number;
+}
+
+export interface PriceTrendForecast {
+  status: string;
+  symbol: string;
+  base_date: string;
+  spot_price: number;
+  futures_price: number;
+  basis: number;
+  short_term_bias: string;
+  mid_term_bias: string;
+  long_term_bias: string;
+  overall_confidence: number;
+  horizons: HorizonDetail[];
+  trajectory_90d: TrajectoryPoint[];
+  cohort: BiologicalCohortSupply;
+  cost: CostAnalysisSummary;
+  drivers: DriversDecomposition;
+  forecast_narrative: string;
+}
+
+export interface SimulationParams {
+  sow_shock_pct: number;
+  feed_cost_shock_pct: number;
+  weight_shock_kg: number;
+  demand_shock_pct: number;
+}
