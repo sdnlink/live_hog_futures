@@ -14,6 +14,8 @@ import BottomDashboard from './components/BottomDashboard';
 import AnalysisReportPanel from './components/AnalysisReportPanel';
 import SentimentValidationPanel from './components/SentimentValidationPanel';
 import PriceTrendForecastPanel from './components/PriceTrendForecastPanel';
+import MiniSpotStockMonitor from './components/MiniSpotStockMonitor';
+import TradingFactorsPanel from './components/TradingFactorsPanel';
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('LH0');
@@ -36,6 +38,7 @@ function App() {
     companySalesData,
     analysisReportData,
     biopharmData,
+    consumablesData,
     feedBreakdownData,
     logisticsSafetyData,
     downstreamDemandData,
@@ -323,17 +326,19 @@ function App() {
           <KpiDashboard expertAdvice={expertAdvice} selectedSymbol={selectedSymbol} quotes={quotes} spotBasisData={spotBasisData} />
 
           <section className="main-dashboard-grid">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <FuturesTable quotes={quotes} selectedSymbol={selectedSymbol} onSymbolSelect={handleSymbolSelect} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <FuturesTable quotes={quotes} selectedSymbol={selectedSymbol} onSymbolSelect={handleSymbolSelect} spotPrice={expertAdvice?.spot_price} />
+              <MiniSpotStockMonitor provPrices={provPrices} stockQuotes={stockQuotes} benchmarkSpot={expertAdvice?.spot_price} />
             </div>
 
-            <article className="glass-panel" style={{ minWidth: 0 }}>
+            <article className="glass-panel" style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <div className="panel-title-bar" style={{ marginBottom: '8px' }}>
                 <div className="chart-tabs-bar">
-                  {['analysis-report', 'price-forecast', 'sentiment-validation', 'spot-futures', 'basis', 'cost-profits', 'capacity', 'advanced-macro', 'calculator', 'yijing'].map(tab => (
-                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''} ${tab === 'price-forecast' ? 'yijing-tab' : ''} ${tab === 'analysis-report' ? 'yijing-tab' : ''} ${tab === 'sentiment-validation' ? 'yijing-tab' : ''} ${tab === 'advanced-macro' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); if (tab === 'analysis-report') fetchAnalysisReport(); if (tab === 'price-forecast') fetchPriceTrendForecast(); }}>
+                  {['factors-matrix', 'analysis-report', 'price-forecast', 'sentiment-validation', 'spot-futures', 'basis', 'cost-profits', 'capacity', 'advanced-macro', 'calculator', 'yijing'].map(tab => (
+                    <button key={tab} className={`tab-btn ${activeChartTab === tab ? 'active' : ''} ${tab === 'factors-matrix' ? 'yijing-tab' : ''} ${tab === 'yijing' ? 'yijing-tab' : ''} ${tab === 'price-forecast' ? 'yijing-tab' : ''} ${tab === 'analysis-report' ? 'yijing-tab' : ''} ${tab === 'sentiment-validation' ? 'yijing-tab' : ''} ${tab === 'advanced-macro' ? 'yijing-tab' : ''}`} onClick={() => { setActiveChartTab(tab); if (tab === 'yijing') fetchYijingForecast(); if (tab === 'analysis-report') fetchAnalysisReport(); if (tab === 'price-forecast') fetchPriceTrendForecast(); }}>
                       <span>
-                        {tab === 'analysis-report' ? '综合决策报告' :
+                        {tab === 'factors-matrix' ? '全要素驱动' :
+                         tab === 'analysis-report' ? '综合决策报告' :
                          tab === 'price-forecast' ? '未来价格预测' :
                          tab === 'sentiment-validation' ? '舆情交叉印证' :
                          tab === 'spot-futures' ? '期现收敛' : 
@@ -344,6 +349,9 @@ function App() {
                          tab === 'calculator' ? '成本计算器' : 
                          '易卦决策'}
                       </span>
+                      {tab === 'factors-matrix' && (
+                        <span className="predict-badge yijing-badge">专家体系</span>
+                      )}
                       {tab === 'yijing' && (
                         <span className="predict-badge yijing-badge">全预测</span>
                       )}
@@ -371,17 +379,8 @@ function App() {
                 )}
               </div>
 
-              <div className="chart-viewport" style={
-                activeChartTab === 'analysis-report' ? { height: 'auto', minHeight: '600px' } :
-                activeChartTab === 'price-forecast' ? { height: 'auto', minHeight: '800px' } :
-                activeChartTab === 'sentiment-validation' ? { height: 'auto', minHeight: '800px' } :
-                activeChartTab === 'advanced-macro' ? { height: 'auto', minHeight: '800px' } :
-                activeChartTab === 'capacity' ? { height: '1600px' } :
-                activeChartTab === 'yijing' ? { height: 'auto', minHeight: '1000px' } : 
-                activeChartTab === 'calculator' ? { height: 'auto', minHeight: '480px' } : 
-                undefined
-              }>
-                {activeChartTab !== 'analysis-report' && activeChartTab !== 'price-forecast' && (
+              <div className="chart-viewport">
+                {activeChartTab !== 'analysis-report' && activeChartTab !== 'price-forecast' && activeChartTab !== 'factors-matrix' && (
                   <MainCharts 
                     activeChartTab={activeChartTab} spotBasisData={spotBasisData} klineData={klineData}
                     porkPriceData={porkPriceData} costsData={costsData} capacityData={capacityData}
@@ -389,8 +388,15 @@ function App() {
                     companySalesData={companySalesData}
                     substitutePricesData={substitutePricesData} porkImportsData={porkImportsData}
                     breedingEfficiencyData={breedingEfficiencyData} macroEnvironmentalData={macroEnvironmentalData}
+                    biopharmData={biopharmData} consumablesData={consumablesData}
+                    feedBreakdownData={feedBreakdownData} logisticsSafetyData={logisticsSafetyData}
+                    downstreamDemandData={downstreamDemandData}
                     selectedSymbol={selectedSymbol} filterByTimeRange={filterByTimeRange}
+                    expertAdvice={expertAdvice}
                   />
+                )}
+                {activeChartTab === 'factors-matrix' && (
+                  <TradingFactorsPanel />
                 )}
                 {activeChartTab === 'analysis-report' && (
                   <AnalysisReportPanel 
@@ -414,6 +420,7 @@ function App() {
                     saveCalculatorConfig={saveCalculatorConfig} 
                     exportCalculatorReport={exportCalculatorReport} 
                     resetCalculatorConfig={resetCalculatorConfig}
+                    futuresPrice={expertAdvice?.futures_price}
                   />
                 )}
                 {activeChartTab === 'yijing' && (
@@ -423,6 +430,7 @@ function App() {
                   <SentimentValidationPanel
                     sentimentIndex={sentimentIndex}
                     biopharmData={biopharmData}
+                    consumablesData={consumablesData}
                     feedBreakdownData={feedBreakdownData}
                     logisticsSafetyData={logisticsSafetyData}
                     downstreamDemandData={downstreamDemandData}

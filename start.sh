@@ -16,16 +16,16 @@ echo "=========================================================="
 
 # 1. Start docker database container
 echo "1. 正在启动 PostgreSQL 数据库容器..."
-if ! command -v docker-compose &> /dev/null && ! command -v docker &> /dev/null; then
-    echo "错误: 未检测到 docker-compose 或 docker 命令，请先安装 Docker。"
+if ! command -v docker compose &> /dev/null && ! command -v docker &> /dev/null; then
+    echo "错误: 未检测到 docker compose 或 docker 命令，请先安装 Docker。"
     exit 1
 fi
 
-# Run docker-compose using passwordless sudo if needed
+# Run docker compose using passwordless sudo if needed
 if sudo -n true 2>/dev/null; then
-    sudo docker-compose up -d
+    sudo docker compose up -d
 else
-    docker-compose up -d
+    docker compose up -d
 fi
 
 # 2. Wait for PostgreSQL port to be ready

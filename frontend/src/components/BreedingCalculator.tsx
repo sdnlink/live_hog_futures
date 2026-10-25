@@ -7,6 +7,7 @@ interface BreedingCalculatorProps {
   saveCalculatorConfig: () => void;
   exportCalculatorReport: () => void;
   resetCalculatorConfig: () => void;
+  futuresPrice?: number;
 }
 
 const BreedingCalculator: React.FC<BreedingCalculatorProps> = ({
@@ -15,8 +16,37 @@ const BreedingCalculator: React.FC<BreedingCalculatorProps> = ({
   handleInputChange,
   saveCalculatorConfig,
   exportCalculatorReport,
-  resetCalculatorConfig
+  resetCalculatorConfig,
+  futuresPrice = 12080
 }) => {
+  // Futures price comparison metrics
+  const futuresPriceKg = futuresPrice / 1000;
+  const futuresRevenue = calcInputs.outWeight * futuresPriceKg;
+  const futuresProfit = futuresRevenue - (calcResults.totalCost || 0);
+
+  let futuresValuation = {
+    badge: '中性整理',
+    badgeColor: 'var(--color-warn)',
+    bg: 'rgba(234, 179, 8, 0.1)',
+    advice: '期货盘面贴近完全成本线，期现博弈平稳。'
+  };
+
+  if (futuresProfit < -200) {
+    futuresValuation = {
+      badge: '深度破位 / 行业亏损承压',
+      badgeColor: 'var(--color-down)',
+      bg: 'rgba(239, 68, 68, 0.1)',
+      advice: `期货盘面已跌破理论完全成本线（每头折合亏损约 ${Math.abs(Math.round(futuresProfit))} 元），盘面弱势寻底，防范现货去产能阶段的惯性下跌风险。`
+    };
+  } else if (futuresProfit > 350) {
+    futuresValuation = {
+      badge: '盘面高溢价 / 理论盈利充裕',
+      badgeColor: 'var(--color-warn)',
+      bg: 'rgba(234, 179, 8, 0.1)',
+      advice: `期货盘面折合养殖利润达 +${Math.round(futuresProfit)} 元/头，处于高利润区间，关注产业套保压力。`
+    };
+  }
+
   return (
     <div className="calculator-grid">
       <div className="calc-inputs">
@@ -128,10 +158,34 @@ const BreedingCalculator: React.FC<BreedingCalculatorProps> = ({
 
         <div className="calc-res-total">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>测算净利润:</span>
-            <span className={`calc-res-val mono ${calcResults.profit >= 0 ? 'profit-up' : 'profit-down'}`} style={{ fontSize: '1.4rem' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>现货测算净利润:</span>
+            <span className={`calc-res-val mono ${calcResults.profit >= 0 ? 'profit-up' : 'profit-down'}`} style={{ fontSize: '1.25rem' }}>
               {calcResults.profit >= 0 ? '+' : ''}{calcResults.profit} 元
             </span>
+          </div>
+        </div>
+
+        {/* Futures Valuation Box - 期货盘面成本对照与套保/抄底价值 */}
+        <div style={{
+          marginTop: '10px',
+          padding: '10px 12px',
+          background: futuresValuation.bg,
+          border: `1px solid ${futuresValuation.badgeColor}`,
+          borderRadius: '8px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+              期货主力盘面折合 ({futuresPriceKg.toFixed(2)} 元/kg)
+            </span>
+            <span className="mono" style={{ fontSize: '0.74rem', fontWeight: 700, color: futuresProfit >= 0 ? 'var(--color-up)' : 'var(--color-down)' }}>
+              盘面利润: {futuresProfit >= 0 ? `+${Math.round(futuresProfit)}` : Math.round(futuresProfit)} 元/头
+            </span>
+          </div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: futuresValuation.badgeColor, marginBottom: '3px' }}>
+            {futuresValuation.badge}
+          </div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+            {futuresValuation.advice}
           </div>
         </div>
 

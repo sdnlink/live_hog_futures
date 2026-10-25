@@ -4,7 +4,9 @@
 import requests
 import sys
 
-BASE_URL = "http://localhost:8000"
+import os
+
+BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 
 def request_endpoint(path, method="GET", params=None, json_data=None):
@@ -208,9 +210,94 @@ def main():
             "params": {"symbol": "LH0"},
             "validate": lambda data: isinstance(data, dict)
             and data.get("status") == "success"
-            and "executive_summary" in data,
+            and "summary" in data,
         },
-        # 22. Sync all
+        # 22. Futures term structure & calendar spreads
+        {
+            "path": "/api/futures/term_structure",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "contracts" in data
+            and "spreads" in data,
+        },
+        # 23. Full-factor driver matrix
+        {
+            "path": "/api/analysis/factors_matrix",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "dimensions" in data
+            and len(data["dimensions"]) >= 5,
+        },
+        # 24. DCE delivery arbitrage calculator
+        {
+            "path": "/api/arbitrage/delivery_calculator",
+            "method": "GET",
+            "params": {"contract": "LH2701", "location": "henan", "weight_grade": "standard"},
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "breakeven_delivery_cost" in data,
+        },
+        # 25. Top 20 Member Positions (龙虎榜)
+        {
+            "path": "/api/futures/broker_positions",
+            "method": "GET",
+            "params": {"contract": "LH2701"},
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "top_short_members" in data
+            and "net_lots" in data,
+        },
+        # 26. Industry Hedging Sandbox Simulation
+        {
+            "path": "/api/arbitrage/hedging_simulation",
+            "method": "GET",
+            "params": {"annual_heads": 100000, "hedge_ratio": 0.6},
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "scenarios" in data
+            and len(data["scenarios"]) == 5,
+        },
+        # 27. Micro Standard-to-Fat Hog Spreads & Secondary Fattening
+        {
+            "path": "/api/analysis/micro_spreads",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "spread" in data
+            and "fat_standard_ratio" in data,
+        },
+        # 28. Cull Sow Liquidation & Cycle Turning Point
+        {
+            "path": "/api/analysis/cull_sow_clearing",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "cull_to_standard_ratio" in data
+            and "cycle_bottom_probability_pct" in data,
+        },
+        # 29. Futures Roll Yield & Delivery Squeeze Risk
+        {
+            "path": "/api/futures/roll_yield_monitor",
+            "method": "GET",
+            "params": {"active_contract": "LH2701", "next_contract": "LH2703"},
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "annualized_roll_yield_pct" in data
+            and "days_to_delivery_month" in data,
+        },
+        # 30. Global Major Hog Markets & Import Parity
+        {
+            "path": "/api/global/hog_market",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "us_cme_lean_hog_usd_cents_per_lb" in data
+            and "regional_breakdowns" in data
+            and len(data["regional_breakdowns"]) >= 3,
+        },
+        # 31. Sync all
         {
             "path": "/api/sync/all",
             "method": "POST",

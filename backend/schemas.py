@@ -251,6 +251,29 @@ class ConclusionOut(BaseModel):
     radar: RadarScores
 
 
+class CycleSignal(BaseModel):
+    name: str
+    direction: str  # "BUY", "SELL", "HOLD"
+    tag: str
+    color: str  # "up", "warn", "down"
+    reason: str
+
+
+class TradeSetupPlan(BaseModel):
+    target_contract: str
+    action: str  # "STRONG_BUY", "BUY", "NEUTRAL", "SELL", "STRONG_SELL"
+    action_label: str
+    confidence_score: int
+    entry_range: str
+    take_profit: str
+    stop_loss: str
+    risk_reward_ratio: float
+    position_suggestion: str
+    safety_margin_level: str
+    one_sentence_rationale: str
+    cycles: List[CycleSignal]
+
+
 class ExpertAdviceOut(BaseModel):
     status: str
     date: Optional[dt_date] = None
@@ -264,6 +287,7 @@ class ExpertAdviceOut(BaseModel):
     warning_level: str
     conclusion: ConclusionOut
     advice: Dict[str, GroupAdvice]
+    trade_signal: Optional[TradeSetupPlan] = None
 
 
 class EpidemicStatusOut(BaseModel):
@@ -378,6 +402,7 @@ class SwotAnalysisOut(BaseModel):
 
 
 class AnalysisReportResponse(BaseModel):
+    status: str = "success"
     summary: AnalysisSummaryOut
     dimensions: Dict[str, DimensionDetailOut]
     swot: SwotAnalysisOut
@@ -458,3 +483,215 @@ class PriceTrendForecastResponse(BaseModel):
     cost: CostAnalysisSummaryOut
     drivers: DriversDecompositionOut
     forecast_narrative: str
+
+
+# ==============================================================================
+# 专家与深度交易系统全要素扩展模型 (Term Structure, Factor Matrix, Delivery)
+# ==============================================================================
+
+class ContractTermInfo(BaseModel):
+    symbol: str
+    name: str
+    last_price: float
+    settlement: float
+    change_pct: float
+    volume: float
+    open_interest: float
+    basis_to_spot: float  # 现货 - 期货 (元/吨)
+    basis_rate_pct: float  # 基差率 (%)
+    days_to_delivery: int
+    is_main: bool
+
+
+class CalendarSpreadInfo(BaseModel):
+    pair_name: str  # e.g., "LH2701 - LH2611"
+    near_symbol: str
+    far_symbol: str
+    spread: float  # far - near (元/吨)
+    annualized_spread_pct: float  # 年化月差收益率 (%)
+    structure: str  # "CONTANGO" or "BACKWARDATION"
+    percentile: float  # 历史分位 (%)
+    trading_implication: str  # 套利策略含义
+
+
+class TermStructureResponse(BaseModel):
+    status: str
+    base_date: str
+    spot_price: float  # 现货元/吨
+    structure_type: str  # CONTANGO / BACKWARDATION / FLAT
+    structure_label: str
+    contracts: List[ContractTermInfo]
+    spreads: List[CalendarSpreadInfo]
+    hedging_advice: str
+    arbitrage_window: str
+
+
+class FactorItemOut(BaseModel):
+    factor_id: str
+    factor_name: str
+    category: str  # supply, cost, demand, futures, policy
+    current_value_str: str
+    current_value_num: float
+    unit: str
+    benchmark_value: float
+    direction: str  # BULLISH / BEARISH / NEUTRAL
+    direction_label: str
+    impact_level: str  # CRITICAL / HIGH / MEDIUM / LOW
+    score: float  # -100 (极度利空) ~ +100 (极度利多)
+    percentile: float  # 0 - 100%
+    logic_summary: str
+    behavior_transmission: str
+
+
+class FactorDimensionGroupOut(BaseModel):
+    dimension_id: str
+    dimension_name: str
+    dimension_score: float  # -100 ~ +100
+    overall_bias: str  # 偏多 / 偏空 / 中性
+    weight_pct: float
+    factors: List[FactorItemOut]
+
+
+class FactorsMatrixResponse(BaseModel):
+    status: str
+    updated_date: str
+    composite_market_score: float  # -100 (极限极空) ~ +100 (极限极多)
+    market_sentiment_label: str
+    macro_regime: str
+    bearish_factors_count: int
+    bullish_factors_count: int
+    neutral_factors_count: int
+    core_downward_driver: str
+    core_support_anchor: str
+    dimensions: List[FactorDimensionGroupOut]
+    expert_trading_conclusions: List[str]
+
+
+class DeliveryArbitrageResponse(BaseModel):
+    status: str
+    date: str
+    contract: str
+    futures_price: float  # 元/吨
+    spot_price: float  # 元/吨
+    raw_basis: float  # 元/吨
+    location: str  # 河南基准 / 四川 / 广东 / 辽宁
+    location_premium: float  # 地区交割升贴水 (元/吨)
+    weight_discount: float  # 体重扣罚贴水 (元/吨)
+    fees_total: float  # 检验、过磅、押车损耗、过户费 (元/吨)
+    breakeven_delivery_cost: float  # 交割保本成本 (元/吨)
+    arbitrage_profit_per_ton: float  # 无风险期现卖保交割利润 (元/吨)
+    is_window_open: bool  # 是否开启无风险卖保套利窗口
+    arbitrage_advice: str
+
+
+class BrokerPositionItem(BaseModel):
+    rank: int
+    broker_name: str
+    lots: int
+    change_lots: int
+    broker_type: str  # "产业套保席位" | "量化基金席位" | "综合券商席位"
+
+
+class BrokerPositionsResponse(BaseModel):
+    status: str
+    date: str
+    symbol: str
+    total_long_top20: int
+    total_short_top20: int
+    net_bias: str  # "净空头优势" | "净多头优势" | "多空相持"
+    net_lots: int  # long - short
+    cr5_short_concentration_pct: float  # 前5大空头集中度 %
+    top_long_members: List[BrokerPositionItem]
+    top_short_members: List[BrokerPositionItem]
+    institutional_verdict: str
+
+
+class HedgingScenarioItem(BaseModel):
+    scenario_name: str
+    spot_change_pct: float
+    simulated_spot_price: float
+    spot_pnl_wanyuan: float
+    futures_pnl_wanyuan: float
+    combined_net_pnl_wanyuan: float
+    risk_reduction_pct: float
+    verdict: str
+
+
+class HedgingSimulationResponse(BaseModel):
+    status: str
+    date: str
+    farm_capacity_heads: int
+    annual_tonnage: float
+    current_cost_per_kg: float
+    spot_price_per_kg: float
+    futures_hedge_price: float
+    hedge_ratio_pct: float
+    unhedged_total_loss_wanyuan: float
+    hedged_total_loss_wanyuan: float
+    loss_saved_wanyuan: float
+    hedging_efficiency_pct: float
+    scenarios: List[HedgingScenarioItem]
+    expert_hedging_rule: str
+
+
+class StandardFatSpreadResponse(BaseModel):
+    status: str
+    date: str
+    standard_hog_price: float  # 标准猪 110-120kg (元/kg)
+    fat_hog_price: float  # 大肥猪 150kg+ (元/kg)
+    spread: float  # fat - standard (元/kg)
+    fat_standard_ratio: float  # 肥标比
+    spread_status: str  # "深度倒挂(大猪踩踏)" | "小幅倒挂" | "平水" | "标肥溢价(大猪抢手)"
+    average_weight_kg: float  # 规模场出栏均重
+    weight_turning_signal: str  # "高位拐头出清" | "持续攀升压栏" | "低位良性"
+    secondary_fattening_index: float  # 0-100 二育情绪指数
+    secondary_fattening_sentiment: str  # "极度低迷离场" | "观望等待" | "开始抄底截流" | "过热抢猪"
+    history: List[dict]  # 近期标肥价差历史走势
+    expert_analysis: str
+
+
+class CullSowLiquidationResponse(BaseModel):
+    status: str
+    date: str
+    cull_sow_price: float  # 淘汰母猪价格 (元/kg)
+    standard_hog_price: float  # 商品三元标猪 (元/kg)
+    cull_to_standard_ratio: float  # 淘母/标猪比值
+    normal_benchmark_ratio: float  # 平衡年份基准比 (0.72)
+    liquidation_stage: str  # "恐慌甩卖与主动出清阶段" | "被动死扛微亏阶段" | "理性替换阶段" | "惜售压栏阶段"
+    sow_slaughter_utilization_pct: float  # 淘母定点屠宰场开工负荷率 %
+    parity_structure_insight: str  # 胎次结构剖析
+    cycle_bottom_probability_pct: float  # 周期大底探明概率 %
+    expert_verdict: str
+
+
+class RollYieldRiskResponse(BaseModel):
+    status: str
+    date: str
+    active_contract: str  # LH2701
+    next_contract: str  # LH2703
+    price_diff: float  # next - active (元/吨)
+    calendar_spread_pct: float
+    annualized_roll_yield_pct: float  # 年化移仓展期收益率 (多头负收益，空头正收益)
+    structure_label: str  # "Super Contango (强升水)" | "Contango" | "Flat" | "Backwardation"
+    days_to_delivery_month: int
+    delivery_squeeze_risk_level: str  # "极高风险(逼多平仓)" | "中等" | "低"
+    carboard_delivery_penalty_per_ton: float  # 车板交割买方综合折损 (检验+掉秤+运费)
+    roll_strategy_recommendation: str
+
+
+class GlobalHogMarketResponse(BaseModel):
+    status: str
+    date: str
+    us_cme_lean_hog_usd_cents_per_lb: float  # 美分/磅
+    us_cme_price_cny_per_ton: float  # 折合人民币现价 (元/吨)
+    us_export_pork_cost_per_ton: float  # 美猪冷冻猪肉到岸完税成本 (元/吨)
+    eu_carcass_price_eur_per_100kg: float  # 欧盟胴体基准价 (欧元/100kg)
+    eu_import_cost_cny_per_ton: float  # 欧猪到岸完税成本 (元/吨)
+    brazil_live_hog_brl_per_kg: float  # 巴西出栏价 (雷亚尔/kg)
+    brazil_import_cost_cny_per_ton: float  # 巴西极低成本猪肉到岸完税成本 (元/吨)
+    china_domestic_frozen_price_per_ton: float  # 国内2号/4号冻肉均价 (元/吨)
+    import_profit_margin_per_ton: float  # 进口利润 = 国内冻肉 - 最低完税成本 (元/吨)
+    import_window_status: str  # "进口窗口严重关闭(深幅倒挂)" | "微利窗口" | "进口套利暴利开启"
+    global_supply_demand_summary: str
+    regional_breakdowns: List[dict]
+

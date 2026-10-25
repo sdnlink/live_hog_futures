@@ -4,7 +4,7 @@ import {
   Activity, Calendar, ShieldCheck, DollarSign, 
   Eye, RefreshCw, Award
 } from 'lucide-react';
-import type { AnalysisReportResponse } from '../types';
+import type { AnalysisReportResponse, DimensionDetail } from '../types';
 
 interface AnalysisReportPanelProps {
   reportData: AnalysisReportResponse | null;
@@ -104,6 +104,19 @@ const AnalysisReportPanel: React.FC<AnalysisReportPanelProps> = ({ reportData, i
                 <span style={styles.metaLabel}>综合风险评定</span>
                 <span style={{ ...styles.metaVal, color: getRiskColor(summary.risk_level) }}>
                   {getRiskLabel(summary.risk_level)}
+                </span>
+              </div>
+              <div style={styles.metaItem}>
+                <span style={styles.metaLabel}>期货入手研判</span>
+                <span style={{
+                  ...styles.metaVal,
+                  color: summary.composite_index >= 60 ? 'var(--color-up)' : summary.composite_index <= 40 ? 'var(--color-down)' : 'var(--color-warn)',
+                  fontWeight: 700
+                }}>
+                  {summary.composite_index >= 65 ? '🟢 强烈看多·逢低买' :
+                   summary.composite_index >= 50 ? '🟢 偏多配置·顺势吸' :
+                   summary.composite_index <= 35 ? '🔴 强烈看空·逢高套' :
+                   '🟡 中性观望·等待收敛'}
                 </span>
               </div>
             </div>
@@ -228,7 +241,7 @@ const AnalysisReportPanel: React.FC<AnalysisReportPanelProps> = ({ reportData, i
           </div>
 
           <div style={styles.dimensionsList}>
-            {Object.entries(dimensions).map(([key, dim]) => {
+            {(Object.entries(dimensions) as [string, DimensionDetail][]).map(([key, dim]) => {
               // Custom config for colors & translation
               let cnName = '';
               let barColor = 'var(--color-accent)';
@@ -356,9 +369,9 @@ const AnalysisReportPanel: React.FC<AnalysisReportPanelProps> = ({ reportData, i
             <span style={{ ...styles.actionVal, color: 'var(--color-accent)' }}>基差交易，逢高卖保</span>
           </div>
           <ul style={styles.guideList}>
-            <li>基差处于历史高分位数时，现货升水严重，建议养殖企业在主力合约卖出套保，锁定利润。</li>
-            <li>长线投资者可趁疫情抛售导致的盘面砸坑机会，分批建仓远期合约（如 LH2701）多单。</li>
-            <li>短线关注期现货价差收敛进程，交割月前基差将快速向现货靠拢，可做基差收窄套利。</li>
+            <li>盘面受现货持续下探拖累，处于单边寻底通道，严禁左侧盲目逆势接飞刀，切忌在现货止跌前盲目抄底。</li>
+            <li>基差处于升水承压结构，养殖企业宜把握盘面反弹窗口建立卖出套保头寸，锁定出栏亏损敞口。</li>
+            <li>短线关注期现货价差收敛进程，交割月前基差将快速向现货靠拢，重点防范惯性下杀与交割贴水风险。</li>
           </ul>
         </div>
       </div>

@@ -1,20 +1,28 @@
 #!/bin/bash
 set -e
 
+echo "=========================================================="
 echo "    生猪期货终端 本地自动化配置与部署"
+echo "=========================================================="
 
-# 1. Stop any currently running docker-compose services
-echo "1. 正在停止并清理现有的 Docker 容器与服务..."
-sudo docker-compose down --remove-orphans
+# Check docker compose command
+if command -v docker &>/dev/null && docker compose version &>/dev/null; then
+    DOCKER_COMPOSE="docker compose"
+elif command -v docker-compose &>/dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    echo "错误: 未检测到 docker compose 命令，请先安装 Docker。"
+    exit 1
+fi
 
-# 2. Build and start services
-echo "2. 正在重新编译并启动 Docker 容器服务 (Postgres, Backend, Frontend, Nginx)..."
-sudo docker-compose up -d --build
+# 1. Build and start services
+echo "1. 正在重新构建并启动 Docker 容器服务 (Postgres, Backend, Frontend, Nginx)..."
+$DOCKER_COMPOSE up -d --build
 
-# 3. Wait for PostgreSQL to be healthy inside the container
-echo "3. 等待 PostgreSQL 数据库就绪 (pg_isready)..."
+# 2. Wait for PostgreSQL to be healthy inside the container
+echo "2. 等待 PostgreSQL 数据库就绪 (pg_isready)..."
 for i in {1..30}; do
-    if sudo docker exec qihuo_postgres pg_isready -U qihuo_user -d qihuo_db &>/dev/null; then
+    if docker exec qihuo_postgres pg_isready -U qihuo_user -d qihuo_db &>/dev/null; then
         echo "PostgreSQL 数据库已就绪，正在进行下一步。"
         break
     fi
@@ -22,13 +30,13 @@ for i in {1..30}; do
     sleep 1
 done
 
-# 4. Initialize Database schema inside backend container
-echo "4. 正在容器内初始化数据库表结构 (backend.init_db)..."
-sudo docker exec qihuo_backend python -m backend.init_db
+# 3. Initialize Database schema inside backend container
+echo "3. 正在容器内初始化数据库表结构 (backend.init_db)..."
+docker exec qihuo_backend python -m backend.init_db
 
-# 5. Populate initial/seed data inside backend container
-echo "5. 正在容器内抓取并填充基本面初始化数据 (backend.seed_data)..."
-sudo docker exec qihuo_backend python -m backend.seed_data
+# 4. Restart services to ensure fresh code and connections
+echo "4. 重新加载最新后端 API 与前端服务..."
+$DOCKER_COMPOSE restart backend frontend nginx
 
 echo "=========================================================="
 echo "    本地自动化配置部署完成！"

@@ -3,15 +3,16 @@ import {
   LineChart, Line, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, ComposedChart
 } from 'recharts';
 import { 
-  Activity, TrendingUp, ShieldAlert, Award, FileText, CheckCircle2
+  Activity, TrendingUp, ShieldAlert, Award, FileText, CheckCircle2, Zap
 } from 'lucide-react';
 import type { 
-  SentimentIndex, BiopharmaceuticalProcurement, FeedSalesBreakdown, HogLogisticsSafety, PorkDownstreamDemand 
+  SentimentIndex, BiopharmaceuticalProcurement, BreedingConsumable, FeedSalesBreakdown, HogLogisticsSafety, PorkDownstreamDemand 
 } from '../types';
 
 interface SentimentValidationPanelProps {
   sentimentIndex: SentimentIndex[];
   biopharmData: BiopharmaceuticalProcurement[];
+  consumablesData?: BreedingConsumable[];
   feedBreakdownData: FeedSalesBreakdown[];
   logisticsSafetyData: HogLogisticsSafety[];
   downstreamDemandData: PorkDownstreamDemand[];
@@ -37,6 +38,7 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
 const SentimentValidationPanel: React.FC<SentimentValidationPanelProps> = ({
   sentimentIndex,
   biopharmData,
+  consumablesData,
   feedBreakdownData,
   logisticsSafetyData,
   downstreamDemandData,
@@ -58,6 +60,7 @@ const SentimentValidationPanel: React.FC<SentimentValidationPanelProps> = ({
   }, [sentimentIndex, filterByTimeRange]);
 
   const filteredBiopharm = useMemo(() => filterByTimeRange(biopharmData), [biopharmData, filterByTimeRange]);
+  const filteredConsumables = useMemo(() => filterByTimeRange(consumablesData || []), [consumablesData, filterByTimeRange]);
   const filteredFeed = useMemo(() => filterByTimeRange(feedBreakdownData), [feedBreakdownData, filterByTimeRange]);
   const filteredDemand = useMemo(() => filterByTimeRange(downstreamDemandData), [downstreamDemandData, filterByTimeRange]);
   const filteredLogistics = useMemo(() => filterByTimeRange(logisticsSafetyData), [logisticsSafetyData, filterByTimeRange]);
@@ -85,6 +88,51 @@ const SentimentValidationPanel: React.FC<SentimentValidationPanelProps> = ({
 
   return (
     <div style={styles.container}>
+      {/* Divergence Verdict Ribbon - 物理实物与网络情绪背离裁决 */}
+      <div style={{
+        padding: '12px 18px',
+        borderRadius: '10px',
+        background: stats.verificationStatus.includes('警惕')
+          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%)'
+          : 'linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%)',
+        border: stats.verificationStatus.includes('警惕') ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(34, 197, 94, 0.35)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px',
+        flexWrap: 'wrap',
+        gap: '10px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Zap size={20} style={{ color: stats.verificationStatus.includes('警惕') ? 'var(--color-down)' : 'var(--color-up)' }} />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                前瞻物理指标背离印证裁决
+              </span>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                background: stats.verificationStatus.includes('警惕') ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)',
+                color: stats.verificationStatus.includes('警惕') ? 'var(--color-down)' : 'var(--color-up)'
+              }}>
+                {stats.verificationStatus.includes('警惕') ? '🚨 出现背离风险' : '🛡️ 物理多维印证坚实'}
+              </span>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '3px', margin: 0 }}>
+              {stats.verificationStatus.includes('警惕')
+                ? '提示：监测到网络情绪热度与实体兽药采购或饲料消耗出现背离，谨防盘面虚假繁荣或过度踩踏，逢高套保为宜。'
+                : '提示：线下动保采购与饲料细分销量真实反映基础产能出清，无虚假压栏泡沫，期货多头具备真实物理层面支撑。'}
+            </p>
+          </div>
+        </div>
+        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: stats.verificationStatus.includes('警惕') ? 'var(--color-down)' : 'var(--color-up)' }}>
+          {stats.verificationStatus.includes('警惕') ? '期货操作：逢高套保 / 防范挤仓' : '期货操作：回踩吸纳 / 依托实物筑底'}
+        </div>
+      </div>
+
       {/* KPI Header Grid */}
       <div style={styles.kpiGrid}>
         <div className="glass-panel" style={styles.kpiCard}>
@@ -260,6 +308,35 @@ const SentimentValidationPanel: React.FC<SentimentValidationPanelProps> = ({
                 <Line yAxisId="left" name="死猪处理量 (吨)" type="monotone" dataKey="mortality_waste_disposal" stroke="var(--color-down)" strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
+          </div>
+        </article>
+
+        {/* Section 6: Breeding Consumables Hard Physical Data */}
+        <article className="glass-panel" style={{ ...styles.chartPanel, gridColumn: 'span 2' }}>
+          <div className="panel-title-bar">
+            <div className="panel-title">
+              <Zap size={18} style={{ color: 'var(--color-accent)' }} />
+              <span>母猪配种与产房耗材实际消耗量 (超前 6~10 个月物理验证能繁真实产能)</span>
+            </div>
+          </div>
+          <div style={{ height: '320px', marginTop: '12px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredConsumables} margin={{ top: 10, right: 20, left: -25, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+                <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis stroke="var(--text-muted)" fontSize={10} />
+                <Tooltip content={<CustomChartTooltip />} />
+                <Legend verticalAlign="top" height={36} iconSize={8} wrapperStyle={{ fontSize: '0.7rem' }} />
+                <Line name="人工授精管 (万支 - 领先10个月)" type="monotone" dataKey="insemination_catheters" stroke="var(--color-accent)" strokeWidth={2} dot={false} />
+                <Line name="精液稀释粉 (万包 - 领先10个月)" type="monotone" dataKey="semen_extender" stroke="var(--color-up)" strokeWidth={2} dot={false} />
+                <Line name="护舍干燥粉 (吨 - 领先6个月分娩)" type="monotone" dataKey="farrowing_dry_powder" stroke="var(--color-warn)" strokeWidth={2} dot={false} />
+                <Line name="仔猪补铁针 (万支 - 领先6个月健仔)" type="monotone" dataKey="iron_injection" stroke="#ec4899" strokeWidth={1.5} dot={false} />
+                <Line name="防疫耳标 (万套 - 领先4个月保育)" type="monotone" dataKey="ear_tags" stroke="#a855f7" strokeWidth={1.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px' }}>
+            🔍 <strong>实物前瞻校验法则：</strong>能繁母猪从配种到育肥出栏需经历 114天怀孕 + 180天育肥（约9.8个月）。当社会统计能繁母猪存栏发生争议时，输精管与稀释粉销量即为真实配种的铁证；护舍粉与补铁针则直接映射接生仔猪头数，有效刺破口头假去化或虚假瞒报。
           </div>
         </article>
 

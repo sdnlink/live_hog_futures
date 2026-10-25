@@ -207,6 +207,29 @@ export interface YijingForecast {
   };
 }
 
+export interface CycleSignal {
+  name: string;
+  direction: 'BUY' | 'SELL' | 'HOLD';
+  tag: string;
+  color: 'up' | 'warn' | 'down';
+  reason: string;
+}
+
+export interface TradeSetupPlan {
+  target_contract: string;
+  action: 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL';
+  action_label: string;
+  confidence_score: number;
+  entry_range: string;
+  take_profit: string;
+  stop_loss: string;
+  risk_reward_ratio: number;
+  position_suggestion: string;
+  safety_margin_level: string;
+  one_sentence_rationale: string;
+  cycles: CycleSignal[];
+}
+
 export interface ExpertAdvice {
   status: string;
   date: string;
@@ -234,6 +257,7 @@ export interface ExpertAdvice {
     middle: { title: string; action: string; bullets: string[] };
     traders: { title: string; action: string; bullets: string[] };
   };
+  trade_signal?: TradeSetupPlan;
 }
 
 export interface BiopharmaceuticalProcurement {
@@ -435,3 +459,230 @@ export interface SimulationParams {
   weight_shock_kg: number;
   demand_shock_pct: number;
 }
+
+export interface ContractTermInfo {
+  symbol: string;
+  name: string;
+  last_price: number;
+  settlement: number;
+  change_pct: number;
+  volume: number;
+  open_interest: number;
+  basis_to_spot: number;
+  basis_rate_pct: number;
+  days_to_delivery: number;
+  is_main: boolean;
+}
+
+export interface CalendarSpreadInfo {
+  pair_name: string;
+  near_symbol: string;
+  far_symbol: string;
+  spread: number;
+  annualized_spread_pct: number;
+  structure: 'CONTANGO' | 'BACKWARDATION';
+  percentile: number;
+  trading_implication: string;
+}
+
+export interface TermStructureResponse {
+  status: string;
+  base_date: string;
+  spot_price: number;
+  structure_type: string;
+  structure_label: string;
+  contracts: ContractTermInfo[];
+  spreads: CalendarSpreadInfo[];
+  hedging_advice: string;
+  arbitrage_window: string;
+}
+
+export interface FactorItem {
+  factor_id: string;
+  factor_name: string;
+  category: 'supply' | 'cost' | 'demand' | 'futures' | 'policy';
+  current_value_str: string;
+  current_value_num: number;
+  unit: string;
+  benchmark_value: number;
+  direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  direction_label: string;
+  impact_level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  score: number;
+  percentile: number;
+  logic_summary: string;
+  behavior_transmission: string;
+}
+
+export interface FactorDimensionGroup {
+  dimension_id: string;
+  dimension_name: string;
+  dimension_score: number;
+  overall_bias: string;
+  weight_pct: number;
+  factors: FactorItem[];
+}
+
+export interface FactorsMatrixResponse {
+  status: string;
+  updated_date: string;
+  composite_market_score: number;
+  market_sentiment_label: string;
+  macro_regime: string;
+  bearish_factors_count: number;
+  bullish_factors_count: number;
+  neutral_factors_count: number;
+  core_downward_driver: string;
+  core_support_anchor: string;
+  dimensions: FactorDimensionGroup[];
+  expert_trading_conclusions: string[];
+}
+
+export interface DeliveryArbitrageResponse {
+  status: string;
+  date: string;
+  contract: string;
+  futures_price: number;
+  spot_price: number;
+  raw_basis: number;
+  location: string;
+  location_premium: number;
+  weight_discount: number;
+  fees_total: number;
+  breakeven_delivery_cost: number;
+  arbitrage_profit_per_ton: number;
+  is_window_open: boolean;
+  arbitrage_advice: string;
+}
+
+export interface BrokerPositionItem {
+  rank: number;
+  broker_name: string;
+  lots: number;
+  change_lots: number;
+  broker_type: string;
+}
+
+export interface BrokerPositionsResponse {
+  status: string;
+  date: string;
+  symbol: string;
+  total_long_top20: number;
+  total_short_top20: number;
+  net_bias: string;
+  net_lots: number;
+  cr5_short_concentration_pct: number;
+  top_long_members: BrokerPositionItem[];
+  top_short_members: BrokerPositionItem[];
+  institutional_verdict: string;
+}
+
+export interface HedgingScenarioItem {
+  scenario_name: string;
+  spot_change_pct: number;
+  simulated_spot_price: number;
+  spot_pnl_wanyuan: number;
+  futures_pnl_wanyuan: number;
+  combined_net_pnl_wanyuan: number;
+  risk_reduction_pct: number;
+  verdict: string;
+}
+
+export interface HedgingSimulationResponse {
+  status: string;
+  date: string;
+  farm_capacity_heads: number;
+  annual_tonnage: number;
+  current_cost_per_kg: number;
+  spot_price_per_kg: number;
+  futures_hedge_price: number;
+  hedge_ratio_pct: number;
+  unhedged_total_loss_wanyuan: number;
+  hedged_total_loss_wanyuan: number;
+  loss_saved_wanyuan: number;
+  hedging_efficiency_pct: number;
+  scenarios: HedgingScenarioItem[];
+  expert_hedging_rule: string;
+}
+
+export interface StandardFatHistoryItem {
+  day: string;
+  standard: number;
+  fat: number;
+  spread: number;
+}
+
+export interface StandardFatSpreadResponse {
+  status: string;
+  date: string;
+  standard_hog_price: number;
+  fat_hog_price: number;
+  spread: number;
+  fat_standard_ratio: number;
+  spread_status: string;
+  average_weight_kg: number;
+  weight_turning_signal: string;
+  secondary_fattening_index: number;
+  secondary_fattening_sentiment: string;
+  history: StandardFatHistoryItem[];
+  expert_analysis: string;
+}
+
+export interface CullSowLiquidationResponse {
+  status: string;
+  date: string;
+  cull_sow_price: number;
+  standard_hog_price: number;
+  cull_to_standard_ratio: number;
+  normal_benchmark_ratio: number;
+  liquidation_stage: string;
+  sow_slaughter_utilization_pct: number;
+  parity_structure_insight: string;
+  cycle_bottom_probability_pct: number;
+  expert_verdict: string;
+}
+
+export interface RollYieldRiskResponse {
+  status: string;
+  date: string;
+  active_contract: string;
+  next_contract: string;
+  price_diff: number;
+  calendar_spread_pct: number;
+  annualized_roll_yield_pct: number;
+  structure_label: string;
+  days_to_delivery_month: number;
+  delivery_squeeze_risk_level: string;
+  carboard_delivery_penalty_per_ton: number;
+  roll_strategy_recommendation: string;
+}
+
+export interface GlobalRegionItem {
+  region: string;
+  benchmark_index: string;
+  production_cost: string;
+  herd_status: string;
+  export_to_china_cny_ton: number;
+  export_volume_trend: string;
+  status: string;
+}
+
+export interface GlobalHogMarketResponse {
+  status: string;
+  date: string;
+  us_cme_lean_hog_usd_cents_per_lb: number;
+  us_cme_price_cny_per_ton: number;
+  us_export_pork_cost_per_ton: number;
+  eu_carcass_price_eur_per_100kg: number;
+  eu_import_cost_cny_per_ton: number;
+  brazil_live_hog_brl_per_kg: number;
+  brazil_import_cost_cny_per_ton: number;
+  china_domestic_frozen_price_per_ton: number;
+  import_profit_margin_per_ton: number;
+  import_window_status: string;
+  global_supply_demand_summary: string;
+  regional_breakdowns: GlobalRegionItem[];
+}
+
+
+
