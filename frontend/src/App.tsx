@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Layers, Activity, ShieldAlert } from 'lucide-react';
+import { RefreshCw, Layers, Activity, ShieldAlert, Compass } from 'lucide-react';
 import './App.css';
 
 // Custom Hooks & Components
@@ -16,6 +16,7 @@ import SentimentValidationPanel from './components/SentimentValidationPanel';
 import PriceTrendForecastPanel from './components/PriceTrendForecastPanel';
 import MiniSpotStockMonitor from './components/MiniSpotStockMonitor';
 import TradingFactorsPanel from './components/TradingFactorsPanel';
+import SupplyDemandCockpit from './components/SupplyDemandCockpit';
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('LH0');
@@ -62,7 +63,7 @@ function App() {
   } = useAppData(selectedSymbol);
 
   // UI Interactive States
-  const [activePage, setActivePage] = useState<'terminal' | 'macro-stocks'>('terminal');
+  const [activePage, setActivePage] = useState<'cockpit' | 'terminal' | 'macro-stocks'>('cockpit');
   const [activeChartTab, setActiveChartTab] = useState<string>('analysis-report');
   const [activeAdviceTab, setActiveAdviceTab] = useState<'farmers' | 'middle' | 'traders'>('farmers');
   const [timeRange, setTimeRange] = useState<'30d' | '90d' | '180d' | 'all'>('all');
@@ -304,12 +305,20 @@ function App() {
       {/* Main Page Navigation Selector */}
       <div className="chart-tabs-bar" style={{ display: 'inline-flex', marginTop: '16px', gap: '8px', padding: '4px' }}>
         <button 
+          className={`tab-btn ${activePage === 'cockpit' ? 'active' : ''}`} 
+          onClick={() => setActivePage('cockpit')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: activePage === 'cockpit' ? 700 : 500 }}
+        >
+          <Compass size={16} style={{ color: activePage === 'cockpit' ? '#fff' : 'var(--color-accent)' }} />
+          <span>🎯 供需一览决策总舱 (极简直观)</span>
+        </button>
+        <button 
           className={`tab-btn ${activePage === 'terminal' ? 'active' : ''}`} 
           onClick={() => setActivePage('terminal')}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
           <Activity size={16} />
-          <span>期现决策终端</span>
+          <span>🔬 产业全要素穿透终端</span>
         </button>
         <button 
           className={`tab-btn ${activePage === 'macro-stocks' ? 'active' : ''}`} 
@@ -317,11 +326,21 @@ function App() {
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
           <Layers size={16} />
-          <span>宏观与上市公司股票看板</span>
+          <span>📈 宏观与上市公司股票看板</span>
         </button>
       </div>
 
-      {activePage === 'terminal' ? (
+      {activePage === 'cockpit' && (
+        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <KpiDashboard expertAdvice={expertAdvice} selectedSymbol={selectedSymbol} quotes={quotes} spotBasisData={spotBasisData} />
+          <SupplyDemandCockpit onSwitchToProDetail={(tab) => {
+            setActivePage('terminal');
+            if (tab) setActiveChartTab(tab);
+          }} />
+        </div>
+      )}
+
+      {activePage === 'terminal' && (
         <>
           <KpiDashboard expertAdvice={expertAdvice} selectedSymbol={selectedSymbol} quotes={quotes} spotBasisData={spotBasisData} />
 
@@ -443,7 +462,9 @@ function App() {
             <ExpertPanel expertAdvice={expertAdvice} activeAdviceTab={activeAdviceTab} setActiveAdviceTab={setActiveAdviceTab} />
           </section>
         </>
-      ) : (
+      )}
+
+      {activePage === 'macro-stocks' && (
         <div style={{ marginTop: '16px' }}>
           <BottomDashboard provPrices={provPrices} epidemicReports={epidemicReports} stockData={stockData} stockQuotes={stockQuotes} isFullPage={true} />
         </div>

@@ -684,5 +684,57 @@ export interface GlobalHogMarketResponse {
   regional_breakdowns: GlobalRegionItem[];
 }
 
+export interface PillarDetail {
+  name: string;
+  category: string;
+  status_label: string;
+  traffic_light: 'red' | 'yellow' | 'green';
+  primary_metric: string;
+  sub_metric: string;
+  takeaway: string;
+}
+
+export interface TimelineMonth {
+  period: string;
+  contract: string;
+  supply: number;
+  demand: number;
+  gap_pct: number;
+  status: string;
+  bias: string;
+}
+
+export interface ContractGuidance {
+  symbol: string;
+  name: string;
+  price: number;
+  basis: number;
+  verdict: string;
+  color: string;
+  comment: string;
+}
+
+export interface MasterVerdict {
+  status: string;
+  status_code: string;
+  net_gap_pct: number;
+  monthly_supply_tons: number;
+  monthly_demand_tons: number;
+  monthly_surplus_tons: number;
+  trading_bias: string;
+  core_conflict: string;
+  action_level: string;
+}
+
+export interface SupplyDemandSummaryResponse {
+  status: string;
+  updated_at: string;
+  verdict: MasterVerdict;
+  pillars: PillarDetail[];
+  timeline_6m: TimelineMonth[];
+  contracts_guidance: ContractGuidance[];
+}
+
+
 
 

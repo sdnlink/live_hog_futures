@@ -297,7 +297,18 @@ def main():
             and "regional_breakdowns" in data
             and len(data["regional_breakdowns"]) >= 3,
         },
-        # 31. Sync all
+        # 31. Supply & Demand Master Summary
+        {
+            "path": "/api/analysis/supply_demand_summary",
+            "method": "GET",
+            "validate": lambda data: isinstance(data, dict)
+            and data.get("status") == "success"
+            and "verdict" in data
+            and "pillars" in data
+            and len(data["pillars"]) == 4
+            and "timeline_6m" in data,
+        },
+        # 32. Sync all
         {
             "path": "/api/sync/all",
             "method": "POST",

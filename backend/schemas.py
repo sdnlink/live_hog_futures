@@ -695,3 +695,55 @@ class GlobalHogMarketResponse(BaseModel):
     global_supply_demand_summary: str
     regional_breakdowns: List[dict]
 
+
+class PillarDetail(BaseModel):
+    name: str
+    category: str
+    status_label: str
+    traffic_light: str  # "red" | "yellow" | "green"
+    primary_metric: str
+    sub_metric: str
+    takeaway: str
+
+
+class TimelineMonth(BaseModel):
+    period: str
+    contract: str
+    supply: float
+    demand: float
+    gap_pct: float
+    status: str
+    bias: str
+
+
+class ContractGuidance(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    basis: float
+    verdict: str
+    color: str
+    comment: str
+
+
+class MasterVerdict(BaseModel):
+    status: str
+    status_code: str  # "SURPLUS_SEVERE" | "SURPLUS_MILD" | "BALANCED" | "SHORTAGE"
+    net_gap_pct: float
+    monthly_supply_tons: float
+    monthly_demand_tons: float
+    monthly_surplus_tons: float
+    trading_bias: str
+    core_conflict: str
+    action_level: str  # "STRONG_SELL" | "SELL" | "NEUTRAL" | "BUY"
+
+
+class SupplyDemandSummaryResponse(BaseModel):
+    status: str
+    updated_at: str
+    verdict: MasterVerdict
+    pillars: List[PillarDetail]
+    timeline_6m: List[TimelineMonth]
+    contracts_guidance: List[ContractGuidance]
+
+
